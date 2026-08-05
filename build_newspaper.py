@@ -190,17 +190,13 @@ def ai_deduplicate_articles(articles, category_name, max_items=4):
 
     formatted_list = []
     for idx, art in enumerate(articles, 1):
-        formatted_list.append(f"[{idx}] Title: {art.get('title')}\n    Summary: {art.get('summary')[:150]}")
+        formatted_list.append(f"[{idx}] {art.get('title')}")
 
     articles_str = "\n".join(formatted_list)
     prompt = (
-        f"You are a news editor filtering articles for the section '{category_name}'.\n"
-        f"Below is a list of news items collected from multiple RSS feeds:\n\n"
-        f"{articles_str}\n\n"
-        f"Task:\n"
-        f"Identify and select up to {max_items} UNIQUE stories. Remove any duplicate stories or different feeds reporting on the exact same event.\n"
-        f"Return ONLY a JSON array containing the 1-based indices of the selected unique articles in preferred order, e.g.: [1, 3, 4]\n"
-        f"Do not include any explanation or extra text outside the JSON array."
+        f"Category: {category_name}\n"
+        f"Titles:\n{articles_str}\n\n"
+        f"Select up to {max_items} unique story indices. Remove duplicates. Return ONLY a JSON array of indices, e.g. [1, 3, 4]:"
     )
 
     try:
