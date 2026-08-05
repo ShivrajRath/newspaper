@@ -91,20 +91,18 @@
         .article-links {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 0.88rem;
-            border-top: 1px dashed var(--border-color);
             padding-top: 10px;
         }
 
-        .article-links a {
-            color: var(--accent-color);
-            text-decoration: none;
-            display: block;
-            margin-bottom: 6px;
-            line-height: 1.4;
+        .article-links .article-item {
+            margin-bottom: 14px;
         }
 
-        .article-links a:hover {
-            text-decoration: underline;
+        .article-links p {
+            margin: 2px 0 0 0;
+            color: #444;
+            font-family: 'Georgia', serif;
+            font-size: 0.92rem;
         }
 
         @media (max-width: 500px) {
@@ -147,13 +145,9 @@
                 // Helper to strip HTML tags and remove empty bullet-only lines
                 const stripHtml = (s) => {
                     if (!s) return '';
-                    // remove anchor tags but keep inner text
                     s = s.replace(/<a[^>]*>(.*?)<\/a>/gi, '$1');
-                    // remove remaining tags
                     s = s.replace(/<[^>]+>/g, ' ');
-                    // normalize whitespace
                     s = s.replace(/\s+/g, ' ').trim();
-                    // remove lines that are only bullets or dashes
                     const lines = s.split(/\n|\\r/).map(l => l.trim()).filter(l => {
                         return !(l === '•' || l === '-' || /^[-•*\s]+$/.test(l) || l === '');
                     });
@@ -165,7 +159,8 @@
                     const articlesHTML = (details.articles || []).map(art => {
                         const t = stripHtml(art.title) || 'Untitled';
                         const summ = stripHtml(art.summary);
-                        return `<div><strong>${t}</strong>${summ ? `<p>${summ}</p>` : ''}</div>`;
+                        const titleHTML = `<strong>${t}</strong>`;
+                        return `<div class="article-item">${titleHTML}${summ ? `<p>${summ}</p>` : ''}</div>`;
                     }).join('');
                     const bodyText = stripHtml(details.summary || '');
                     const summaryBlock = bodyText ? `<div class="summary-body">${bodyText.replace(/\n/g, '<br>')}</div>` : '';
@@ -174,7 +169,7 @@
                         <div class="card">
                             <h2>${catName}</h2>
                             ${summaryBlock}
-                            <div class="article-links">${articlesHTML || '<span>No articles available from this feed.</span>'}</div>
+                            <div class="article-links">${articlesHTML || '<span>No articles available from this section.</span>'}</div>
                         </div>
                     `;
                 }).join('');
@@ -184,7 +179,8 @@
                     const hnItems = data.hacker_news.map(hn => {
                         const title = stripHtml(hn.title || 'Untitled');
                         const desc = stripHtml(hn.description || '');
-                        return `<div><strong>${title}</strong>${desc ? `<p>${desc}</p>` : ''} <small>(${hn.score} pts)</small></div>`;
+                        const titleHTML = `<strong>${title}</strong>`;
+                        return `<div class="article-item">${titleHTML}${desc ? `<p>${desc}</p>` : ''} <small style="color: #666;">(${hn.score} pts)</small></div>`;
                     }).join('');
 
                     gridHTML += `

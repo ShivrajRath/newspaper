@@ -7,85 +7,53 @@ import ssl
 import feedparser
 import urllib.request
 import urllib.parse
+import difflib
+import time
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-model = None
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+client = None
 
 try:
     if GEMINI_API_KEY:
-        import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-except Exception:
-    model = None
+        from google import genai
+        client = genai.Client(api_key=GEMINI_API_KEY)
+except Exception as e:
+    logging.warning("Gemini AI client initialization failed or key not set: %s", e)
+    client = None
+
+
+def load_config(config_path="config.json"):
+    """Load configuration file or return an empty config if unavailable."""
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                logging.info("Successfully loaded configuration from %s", config_path)
+                return config
+        except Exception as e:
+            logging.error("Failed to parse %s: %s. Using empty config.", config_path, e)
+    else:
+        logging.info("Configuration file %s not found. Using empty config.", config_path)
+    return {}
 
 
 def clean_html(text):
     """Remove anchor tags and other HTML tags, unescape HTML entities."""
     if not text:
         return ""
-    # Remove anchor tags but keep their inner text
     text = re.sub(r'<a[^>]*>(.*?)</a>', r'\1', text, flags=re.DOTALL | re.IGNORECASE)
-    # Remove any remaining tags
     text = re.sub(r'<[^>]+>', ' ', text)
-    # Normalize whitespace and unescape
     text = ' '.join(text.split())
     return html.unescape(text)
 
 
-def summarize_text(articles_text, category_name):
-    """Create a simple non-AI summary: up to 3 concise bullets from article titles/summaries.
-
-    This intentionally avoids calling any external generative model and filters
-    out empty or placeholder lines (like lone bullets).
-    """
-    lines = [line.strip() for line in articles_text.splitlines() if line.strip()]
-    cleaned = []
-    for line in lines:
-        # remove leading bullets or numbering
-        line = re.sub(r'^[\u2022\-\*\s]+', '', line).strip()
-        # drop very short or placeholder lines
-        if not line or line in ('.', '-'): 
-            continue
-        # if the line contains a colon, take text after it (title: summary)
-        if ':' in line:
-            _, text = line.split(':', 1)
-            text = text.strip()
-        else:
-            text = line
-        if text:
-            cleaned.append(text)
-        if len(cleaned) >= 3:
-            break
-
-    if cleaned:
-        return "\n".join(f"• {c}" for c in cleaned)
-    return 'No concise summary available.'
-
-
-FEEDS = {
-    "Science": "https://www.sciencedaily.com/rss/top/science.xml",
-    "Technology": "https://feeds.arstechnica.com/arstechnica/index",
-    "World News": "http://feeds.bbci.co.uk/news/world/rss.xml",
-    "Business": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
-    "Sports": "https://www.theguardian.com/sport/rss",
-    "Frisco TX": "https://news.google.com/rss/search?q=Frisco+TX&hl=en-US&gl=US&ceid=US:en",
-    "Local": "https://www.wfaa.com/feeds/syndication/rss/news/local",
-}
-
-content = {
-    "generated_at": datetime.now().strftime("%B %d, %Y %I:%M %p"),
-    "categories": {},
-    "market": {},
-    "hacker_news": []
-}
-
-
 def safe_fetch_url(url, timeout=15):
+    """Safely fetch raw bytes from URL supporting SSL fallback."""
     parsed = urllib.parse.urlsplit(url)
     query = urllib.parse.quote(parsed.query, safe='=&|:+()') if parsed.query else ''
     safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment))
@@ -101,6 +69,7 @@ def safe_fetch_url(url, timeout=15):
 
 
 def safe_urlopen(url, timeout=15):
+    """Safely open URL returning response handle."""
     parsed = urllib.parse.urlsplit(url)
     query = urllib.parse.quote(parsed.query, safe='=&|:+()') if parsed.query else ''
     safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment))
@@ -114,7 +83,8 @@ def safe_urlopen(url, timeout=15):
     return None
 
 
-def fetch_feed_entries(url, max_items=5):
+def fetch_feed_entries(url, max_items=5, max_age_days=2):
+    """Fetch recent feed entries from an RSS feed URL."""
     raw_data = safe_fetch_url(url)
     if raw_data is None:
         logging.warning("Unable to fetch feed URL: %s", url)
@@ -129,7 +99,7 @@ def fetch_feed_entries(url, max_items=5):
         logging.warning("No entries found for feed URL: %s", url)
         return []
 
-    def entry_is_recent(entry, max_age_days=2):
+    def entry_is_recent(entry):
         parsed = entry.get("published_parsed") or entry.get("updated_parsed")
         if not parsed:
             return True
@@ -154,123 +124,244 @@ def fetch_feed_entries(url, max_items=5):
     return articles
 
 
+def fetch_section_articles(feed_urls, max_per_feed=5):
+    """Fetch articles across all feed URLs specified for a section."""
+    all_articles = []
+    for url in feed_urls:
+        entries = fetch_feed_entries(url, max_items=max_per_feed)
+        all_articles.extend(entries)
+    return all_articles
+
+
+def local_deduplicate_articles(articles, max_items=4):
+    """Filter duplicate or near-duplicate articles using rule-based title similarity."""
+    if not articles:
+        return []
+
+    unique_articles = []
+    seen_titles = []
+
+    for art in articles:
+        title = art.get("title", "").strip()
+        if not title:
+            continue
+
+        normalized_title = re.sub(r'[^\w\s]', '', title.lower())
+        is_duplicate = False
+
+        for seen in seen_titles:
+            # Check exact or near-exact string similarity
+            ratio = difflib.SequenceMatcher(None, normalized_title, seen).ratio()
+            if ratio > 0.65:
+                is_duplicate = True
+                break
+            # Check word overlap
+            words1 = set(normalized_title.split())
+            words2 = set(seen.split())
+            if words1 and words2:
+                intersection = words1.intersection(words2)
+                overlap = len(intersection) / max(len(words1), len(words2))
+                if overlap > 0.7:
+                    is_duplicate = True
+                    break
+
+        if not is_duplicate:
+            unique_articles.append(art)
+            seen_titles.append(normalized_title)
+
+        if len(unique_articles) >= max_items:
+            break
+
+    return unique_articles[:max_items]
+
+
+def ai_deduplicate_articles(articles, category_name, max_items=4):
+    """Use Gemini AI to filter out duplicate/overlapping articles from multiple RSS feeds.
+    
+    Ensures single batched request per section to respect rate limits.
+    Falls back to local_deduplicate_articles on failure or if client is missing.
+    """
+    global client
+    if not articles:
+        return []
+
+    if len(articles) <= 1 or not client:
+        return local_deduplicate_articles(articles, max_items=max_items)
+
+    formatted_list = []
+    for idx, art in enumerate(articles, 1):
+        formatted_list.append(f"[{idx}] Title: {art.get('title')}\n    Summary: {art.get('summary')[:150]}")
+
+    articles_str = "\n".join(formatted_list)
+    prompt = (
+        f"You are a news editor filtering articles for the section '{category_name}'.\n"
+        f"Below is a list of news items collected from multiple RSS feeds:\n\n"
+        f"{articles_str}\n\n"
+        f"Task:\n"
+        f"Identify and select up to {max_items} UNIQUE stories. Remove any duplicate stories or different feeds reporting on the exact same event.\n"
+        f"Return ONLY a JSON array containing the 1-based indices of the selected unique articles in preferred order, e.g.: [1, 3, 4]\n"
+        f"Do not include any explanation or extra text outside the JSON array."
+    )
+
+    try:
+        time.sleep(1)
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt
+        )
+        response_text = response.text.strip()
+        match = re.search(r'\[[\d\s,]+\]', response_text)
+        if match:
+            selected_indices = json.loads(match.group(0))
+            selected_articles = []
+            seen_idx = set()
+            for i in selected_indices:
+                if isinstance(i, int) and 1 <= i <= len(articles) and i not in seen_idx:
+                    selected_articles.append(articles[i - 1])
+                    seen_idx.add(i)
+                if len(selected_articles) >= max_items:
+                    break
+            if selected_articles:
+                logging.info("AI deduplication selected %d unique articles for %s", len(selected_articles), category_name)
+                return selected_articles
+    except Exception as e:
+        err_str = str(e)
+        if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
+            logging.warning("Gemini AI API error (%s). Disabling AI for remaining sections and using local fallback.", e)
+            client = None
+        else:
+            logging.warning("AI deduplication call failed for %s: %s. Using local fallback.", category_name, e)
+
+    return local_deduplicate_articles(articles, max_items=max_items)
+
+
 def extract_page_snippet(url):
-    """Fetches raw text content from the target URL for summarization."""
+    """Fetches raw text content from target URL for summarization."""
     html_bytes = safe_fetch_url(url, timeout=10)
     if not html_bytes:
         return ""
 
-    html = html_bytes.decode("utf-8", errors="ignore")
-    clean_text = re.sub(r'<script.*?>.*?</script>', ' ', html, flags=re.DOTALL | re.IGNORECASE)
+    html_content = html_bytes.decode("utf-8", errors="ignore")
+    clean_text = re.sub(r'<script.*?>.*?</script>', ' ', html_content, flags=re.DOTALL | re.IGNORECASE)
     clean_text = re.sub(r'<style.*?>.*?</style>', ' ', clean_text, flags=re.DOTALL | re.IGNORECASE)
     clean_text = re.sub(r'<[^>]+>', ' ', clean_text)
     return " ".join(clean_text.split())[:1800]
 
 
-def summarize_article_description(snippet):
-    if snippet and model:
+def summarize_hn_stories_batched(items_data):
+    """Summarize multiple HN stories in a single batched Gemini call to preserve rate limits."""
+    global client
+    descriptions = []
+
+    if client and items_data:
+        stories_input = []
+        for idx, item in enumerate(items_data, 1):
+            snippet = item.get("snippet", "")
+            title = item.get("title", "")
+            stories_input.append(f"Story {idx}:\nTitle: {title}\nSnippet: {snippet[:400]}")
+
         prompt = (
-            "Provide a single concise sentence describing what this article is about "
-            "based on this snippet:\n" + snippet
+            "For each story listed below, write a single concise summary sentence (10-20 words).\n"
+            "Return ONLY a JSON array of strings corresponding to each story in order.\n"
+            "Example: [\"Summary 1.\", \"Summary 2.\"]\n\n" +
+            "\n\n".join(stories_input)
         )
+
         try:
-            response = model.generate_content(prompt)
-            text = response.text.strip()
-            if text:
-                return text
-        except Exception:
-            pass
+            time.sleep(1)
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt
+            )
+            match = re.search(r'\[\s*".*?"\s*\]', response.text, flags=re.DOTALL)
+            if match:
+                parsed = json.loads(match.group(0))
+                if isinstance(parsed, list) and len(parsed) == len(items_data):
+                    return [str(s).strip() for s in parsed]
+        except Exception as e:
+            err_str = str(e)
+            if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
+                logging.warning("Gemini AI API error (%s). Disabling AI for remaining tasks and using local fallback.", e)
+                client = None
+            else:
+                logging.warning("Batched HN AI summarization failed: %s. Falling back to snippet extraction.", e)
 
-    if snippet:
-        first_sentence = snippet.split('. ')[0].strip()
-        if first_sentence:
-            return first_sentence.rstrip('.') + '.'
-    return "Click link to read story."
+    # Local fallback for HN descriptions
+    for item in items_data:
+        snippet = item.get("snippet", "")
+        if snippet:
+            first_sentence = snippet.split('. ')[0].strip()
+            if first_sentence:
+                descriptions.append(first_sentence.rstrip('.') + '.')
+                continue
+        descriptions.append("Click link to read story.")
+
+    return descriptions
 
 
-for category, url in FEEDS.items():
-    articles = fetch_feed_entries(url, max_items=5)
-    summary = ""
-    if not articles:
-        summary = "No articles were available from this feed."
+def fetch_hacker_news(hn_config):
+    """Fetch Hacker News top stories using configuration settings."""
+    if not hn_config.get("enabled", True):
+        return []
 
-    content["categories"][category] = {
-        "summary": summary,
-        "articles": articles[:4]
-    }
+    max_items = hn_config.get("max_items", 5)
+    try:
+        with safe_urlopen("https://hacker-news.firebaseio.com/v0/topstories.json", timeout=15) as req:
+            top_ids = json.loads(req.read().decode())[:max_items]
 
+        raw_hn_items = []
+        for item_id in top_ids:
+            with safe_urlopen(f"https://hacker-news.firebaseio.com/v0/item/{item_id}.json", timeout=15) as item_req:
+                data = json.loads(item_req.read().decode())
+                article_url = data.get("url", f"https://news.ycombinator.com/item?id={item_id}")
+                snippet = extract_page_snippet(article_url) if article_url else ""
+                raw_hn_items.append({
+                    "title": data.get("title", "Untitled story"),
+                    "url": article_url,
+                    "score": data.get("score", 0),
+                    "snippet": snippet
+                })
 
-try:
-    with safe_urlopen("https://hacker-news.firebaseio.com/v0/topstories.json", timeout=15) as req:
-        top_ids = json.loads(req.read().decode())[:5]
-    hacker_news = []
-    for item_id in top_ids:
-        with safe_urlopen(f"https://hacker-news.firebaseio.com/v0/item/{item_id}.json", timeout=15) as item_req:
-            data = json.loads(item_req.read().decode())
-            article_url = data.get("url", f"https://news.ycombinator.com/item?id={item_id}")
-            snippet = extract_page_snippet(article_url) if article_url else ""
+        descriptions = summarize_hn_stories_batched(raw_hn_items)
+
+        hacker_news = []
+        for idx, item in enumerate(raw_hn_items):
             hacker_news.append({
-                "title": data.get("title", "Untitled story"),
-                "url": article_url,
-                "score": data.get("score", 0),
-                "description": summarize_article_description(snippet)
+                "title": item["title"],
+                "url": item["url"],
+                "score": item["score"],
+                "description": descriptions[idx] if idx < len(descriptions) else "Click link to read story."
             })
-    content["hacker_news"] = hacker_news
-except Exception:
-    content["hacker_news"] = []
+
+        return hacker_news
+    except Exception as e:
+        logging.error("Error fetching Hacker News: %s", e)
+        return []
 
 
-def parse_google_finance_price(html, symbol, exchange=None):
-    if symbol == "Gold":
-        pattern = r'\["GCW00","COMEX"\],"Gold",\d+,"USD",\[([0-9]+\.[0-9]+),([0-9eE+\-.]+),([0-9eE+\-.]+)'
-    else:
-        symbol_escaped = re.escape(symbol)
-        exchange_escaped = re.escape(exchange or "")
-        pattern = rf'\[\["/m/[^"]*",\["{symbol_escaped}","{exchange_escaped}"\],"[^"]*",\d+,"USD",\[([0-9]+\.[0-9]+),([0-9eE+\-.]+),([0-9eE+\-.]+)'
+def fetch_market_data(market_config):
+    """Fetch stock and commodity market data based on configuration."""
+    if not market_config.get("enabled", True):
+        return {}
 
-    match = re.search(pattern, html)
-    if not match:
-        return None
-
-    price = float(match.group(1))
-    change = float(match.group(2))
-    pct = float(match.group(3))
-    return price, change, pct
-
-
-def fetch_google_finance_price(url, symbol, exchange=None):
-    raw_data = safe_fetch_url(url)
-    if raw_data is None:
-        return None
-
-    html = raw_data.decode("utf-8", errors="replace")
-    parsed = parse_google_finance_price(html, symbol, exchange)
-    if parsed is None:
-        return None
-
-    price, change, pct = parsed
-    return {
-        "price": price,
-        "change": change,
-        "pct": pct
-    }
-
-
-def fetch_market_data():
     market_data = {}
+    tickers_list = market_config.get("tickers", [])
+
     try:
         import yfinance as yf
-        tickers = {
-            "AAPL": "AAPL",
-            "ADSK": "ADSK",
-            "MSFT": "MSFT",
-            "VOO": "VOO"
-        }
-        for ticker, label in tickers.items():
+        for ticker_info in tickers_list:
+            symbol = ticker_info.get("symbol")
+            label = ticker_info.get("label", symbol)
+            ticker_type = ticker_info.get("type", "stock")
+
+            if ticker_type == "commodity":
+                continue
+
             try:
-                stock = yf.Ticker(ticker)
-                with redirect_stdout(open(os.devnull, "w")), redirect_stderr(open(os.devnull, "w")):
-                    hist = stock.history(period="2d")
+                stock = yf.Ticker(symbol)
+                with open(os.devnull, "w") as fnull1, open(os.devnull, "w") as fnull2:
+                    with redirect_stdout(fnull1), redirect_stderr(fnull2):
+                        hist = stock.history(period="2d")
                 if len(hist) >= 2:
                     prev_close = hist["Close"].iloc[-2]
                     curr = hist["Close"].iloc[-1]
@@ -281,28 +372,58 @@ def fetch_market_data():
     except Exception:
         pass
 
-    if "Gold" not in market_data:
-        google_gold = fetch_google_finance_price("https://www.google.com/finance/quote/GC%3D%3DF:COM", "Gold")
-        if google_gold is not None:
-            market_data["Gold"] = f"${google_gold['price']:.2f}/oz ({'+' if google_gold['change'] >= 0 else ''}{google_gold['pct']:.2f}%)"
-
-    google_fallbacks = {
-        "AAPL": ("https://www.google.com/finance/quote/AAPL:NASDAQ", "NASDAQ"),
-        "ADSK": ("https://www.google.com/finance/quote/ADSK:NASDAQ", "NASDAQ"),
-        "MSFT": ("https://www.google.com/finance/quote/MSFT:NASDAQ", "NASDAQ"),
-        "VOO": ("https://www.google.com/finance/quote/VOO:NASDAQ", "NASDAQ")
-    }
-    for label, (url, exchange) in google_fallbacks.items():
-        if label in market_data:
-            continue
-        google_data = fetch_google_finance_price(url, label, exchange)
-        if google_data is not None:
-            market_data[label] = f"${google_data['price']:.2f} ({'+' if google_data['change'] >= 0 else ''}{google_data['pct']:.2f}%)"
-
     return market_data
 
 
-content["market"] = fetch_market_data()
+def build_newspaper():
+    """Main function to load configuration, fetch data, deduplicate, and write newspaper.json."""
+    config = load_config("config.json")
 
-with open("newspaper.json", "w", encoding="utf-8") as f:
-    json.dump(content, f, indent=2, ensure_ascii=False)
+    output_content = {
+        "generated_at": datetime.now().strftime("%B %d, %Y %I:%M %p"),
+        "categories": {},
+        "market": {},
+        "hacker_news": []
+    }
+
+    # Fetch Sections (RSS feeds)
+    sections = config.get("sections", [])
+    for section in sections:
+        sec_name = section.get("name", "General")
+        feed_urls = section.get("feeds", [])
+
+        if not feed_urls:
+            output_content["categories"][sec_name] = {
+                "summary": "",
+                "articles": []
+            }
+            continue
+
+        raw_articles = fetch_section_articles(feed_urls, max_per_feed=5)
+        
+        # Deduplicate articles using AI if multiple feeds, otherwise local deduplication
+        if len(feed_urls) > 1:
+            filtered_articles = ai_deduplicate_articles(raw_articles, sec_name, max_items=4)
+        else:
+            filtered_articles = local_deduplicate_articles(raw_articles, max_items=4)
+
+        output_content["categories"][sec_name] = {
+            "summary": "",
+            "articles": filtered_articles
+        }
+
+    # Fetch Hacker News
+    output_content["hacker_news"] = fetch_hacker_news(config.get("hacker_news", {}))
+
+    # Fetch Market Data
+    output_content["market"] = fetch_market_data(config.get("market", {}))
+
+    # Save to newspaper.json
+    with open("newspaper.json", "w", encoding="utf-8") as f:
+        json.dump(output_content, f, indent=2, ensure_ascii=False)
+
+    logging.info("Successfully generated newspaper.json with %d sections.", len(output_content["categories"]))
+
+
+if __name__ == "__main__":
+    build_newspaper()

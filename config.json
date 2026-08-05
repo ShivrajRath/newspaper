@@ -1,0 +1,95 @@
+{
+  "market": {
+    "enabled": true,
+    "tickers": [
+      {
+        "symbol": "AAPL",
+        "label": "AAPL",
+        "type": "stock",
+        "exchange": "NASDAQ"
+      },
+      {
+        "symbol": "ADSK",
+        "label": "ADSK",
+        "type": "stock",
+        "exchange": "NASDAQ"
+      },
+      {
+        "symbol": "MSFT",
+        "label": "MSFT",
+        "type": "stock",
+        "exchange": "NASDAQ"
+      },
+      {
+        "symbol": "VOO",
+        "label": "VOO",
+        "type": "stock",
+        "exchange": "NASDAQ"
+      },
+      {
+        "symbol": "Gold",
+        "label": "Gold",
+        "type": "commodity",
+        "exchange": "COMEX"
+      }
+    ]
+  },
+  "hacker_news": {
+    "enabled": true,
+    "title": "Hacker News Top Stories",
+    "max_items": 5
+  },
+  "sections": [
+    {
+      "name": "World News",
+      "feeds": [
+        "http://feeds.bbci.co.uk/news/world/rss.xml",
+        "https://www.theguardian.com/world/rss",
+        "https://www.economist.com/the-world-this-week/rss.xml"
+      ]
+    },
+    {
+      "name": "USA",
+      "feeds": [
+        "https://feeds.npr.org/1001/rss.xml",
+        "https://www.cbsnews.com/latest/rss/us"
+      ]
+    },
+    {
+      "name": "India",
+      "feeds": [
+        "http://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
+        "https://www.theguardian.com/world/india/rss",
+        "https://www.aljazeera.com/xml/rss/all.xml"
+      ]
+    },
+    {
+      "name": "Business & Markets",
+      "feeds": ["https://feeds.content.dowjones.io/public/rss/mw_topstories"]
+    },
+    {
+      "name": "Science & Tech",
+      "feeds": [
+        "https://www.sciencedaily.com/rss/top/science.xml",
+        "https://phys.org/rss-feed/",
+        "https://www.nature.com/nature.rss",
+        "https://feeds.arstechnica.com/arstechnica/index",
+        "https://www.theverge.com/rss/index.xml"
+      ]
+    },
+    {
+      "name": "Sports",
+      "feeds": [
+        "https://www.theguardian.com/sport/rss",
+        "http://feeds.bbci.co.uk/sport/rss.xml"
+      ]
+    },
+    {
+      "name": "Local & Regional",
+      "feeds": [
+        "https://www.wfaa.com/feeds/syndication/rss/news/local",
+        "https://news.google.com/rss/search?q=Frisco+TX&hl=en-US&gl=US&ceid=US:en"
+      ]
+    }
+  ]
+}
