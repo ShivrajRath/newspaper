@@ -135,7 +135,7 @@
             background-color: var(--ticker-bg);
             padding: 12px 15px;
             font-family: "JetBrains Mono", monospace;
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             font-weight: 600;
             letter-spacing: 0.04em;
             border: 1px solid var(--border-color);
@@ -143,10 +143,40 @@
             margin-bottom: 28px;
         }
 
-        .ticker-bar span {
-            padding: 4px 8px;
+        .ticker-bar .ticker-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(220, 214, 197, 0.85);
+        }
+
+        .ticker-bar .ticker-label {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 0.88rem;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: var(--accent-color);
+        }
+
+        .ticker-bar .ticker-value {
+            color: var(--text-color);
+            font-weight: 700;
+        }
+
+        .ticker-bar .ticker-change {
+            font-family: "JetBrains Mono", monospace;
+            font-weight: 700;
+        }
+
+        .ticker-bar .positive {
+            color: #1f6d33;
+        }
+
+        .ticker-bar .negative {
+            color: #a1302f;
         }
 
         .grid {
@@ -204,31 +234,40 @@
         }
 
         .article-links .article-item {
-            margin-bottom: 12px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(220, 214, 197, 0.75);
+            margin-bottom: 18px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(220, 214, 197, 0.65);
         }
 
         .article-links .article-item:last-child {
             border-bottom: none;
             padding-bottom: 0;
+            margin-bottom: 0;
         }
 
         .article-links strong {
-            display: inline-block;
+            display: block;
             font-family: "Newsreader", Georgia, serif;
             font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 2px;
-            color: var(--text-color);
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--accent-color);
         }
 
         .article-links p {
-            margin: 4px 0 0 0;
+            margin: 0;
             color: var(--muted-text);
             font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 0.92rem;
-            line-height: 1.5;
+            line-height: 1.7;
+        }
+
+        .article-links small {
+            color: #5c5a50;
+            display: block;
+            margin-top: 8px;
+            font-size: 0.82rem;
+            letter-spacing: 0.02em;
         }
 
         .article-links a {
@@ -341,7 +380,16 @@
 
                 // Render Market Ticker Bar
                 const tickerHTML = Object.entries(data.market || {})
-                    .map(([symbol, value]) => `<span><strong>${symbol}:</strong> ${value}</span>`)
+                    .map(([symbol, value]) => {
+                        const parsed = String(value).match(/^\$(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/);
+                        if (!parsed) {
+                            return `<span class="ticker-item"><span class="ticker-label">${symbol}</span><span class="ticker-value">${value}</span></span>`;
+                        }
+                        const price = parsed[1];
+                        const change = parsed[2];
+                        const changeClass = change.trim().startsWith('+') ? 'positive' : change.trim().startsWith('-') ? 'negative' : '';
+                        return `<span class="ticker-item"><span class="ticker-label">${symbol}</span><span class="ticker-value">$${price}</span><span class="ticker-change ${changeClass}">${change}</span></span>`;
+                    })
                     .join('');
                 document.getElementById('ticker-bar').innerHTML = tickerHTML || '<span>Market data unavailable</span>';
 
