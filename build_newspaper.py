@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+MAX_SECTION_ARTICLES = 8
 client = None
 
 try:
@@ -419,13 +420,13 @@ def build_newspaper():
 
         # Prefer AI selection when available; fall back to local deduplication otherwise.
         if client:
-            filtered_articles = ai_deduplicate_articles(raw_articles, sec_name, max_items=15)
+            filtered_articles = ai_deduplicate_articles(raw_articles, sec_name, max_items=MAX_SECTION_ARTICLES)
         else:
-            filtered_articles = local_deduplicate_articles(raw_articles, max_items=15)
+            filtered_articles = local_deduplicate_articles(raw_articles, max_items=MAX_SECTION_ARTICLES)
 
         output_content["categories"][sec_name] = {
             "summary": "",
-            "articles": filtered_articles
+            "articles": filtered_articles[:MAX_SECTION_ARTICLES]
         }
 
     # Fetch Hacker News

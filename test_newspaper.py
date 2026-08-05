@@ -109,6 +109,30 @@ class TestNewspaperBuilder(unittest.TestCase):
         selected_titles = [article["title"] for article in data["categories"]["Tech"]["articles"]]
         self.assertEqual(selected_titles, ["Alpha Story", "Gamma Story"])
 
+    def test_build_newspaper_limits_section_articles_to_eight(self):
+        articles = [
+            {"title": f"Story {i}", "summary": "Summary", "link": f"http://example.com/{i}"}
+            for i in range(10)
+        ]
+
+        config = {
+            "sections": [{"name": "Tech", "feeds": ["http://example.com/rss.xml"]}],
+            "hacker_news": {"enabled": False},
+            "market": {"enabled": False},
+        }
+
+        with patch.object(builder_module, "load_config", return_value=config), \
+             patch.object(builder_module, "fetch_section_articles", return_value=articles), \
+             patch.object(builder_module, "fetch_quote_of_day", return_value={"text": "", "author": ""}), \
+             patch.object(builder_module, "fetch_hacker_news", return_value=[]), \
+             patch.object(builder_module, "fetch_market_data", return_value={}):
+            builder_module.build_newspaper()
+
+        with open("newspaper.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        self.assertLessEqual(len(data["categories"]["Tech"]["articles"]), 8)
+
     def test_newspaper_json_structure(self):
         build_newspaper()
         self.assertTrue(os.path.exists("newspaper.json"))
