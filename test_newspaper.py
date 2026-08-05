@@ -67,6 +67,41 @@ class TestNewspaperBuilder(unittest.TestCase):
         self.assertTrue(summaries[0].startswith("This is a great new app"))
         self.assertEqual(summaries[1], "Click link to read story.")
 
+    def test_fetch_hacker_news_respects_min_score(self):
+        class FakeResponse:
+            def __init__(self, data):
+                self._data = data
+
+            def read(self):
+                return json.dumps(self._data).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        top_stories = [101, 102, 103]
+        item_101 = {"id": 101, "title": "High Score Story", "url": "https://example.com/101", "score": 120}
+        item_102 = {"id": 102, "title": "Low Score Story", "url": "https://example.com/102", "score": 80}
+        item_103 = {"id": 103, "title": "Borderline Story", "url": "https://example.com/103", "score": 100}
+
+        responses = [
+            FakeResponse(top_stories),
+            FakeResponse(item_101),
+            FakeResponse(item_102),
+            FakeResponse(item_103),
+        ]
+
+        with patch.object(builder_module, "safe_urlopen", side_effect=responses):
+            hacker_news = builder_module.fetch_hacker_news({"enabled": True, "max_items": 3, "min_score": 100})
+
+        self.assertEqual(len(hacker_news), 2)
+        titles = [item["title"] for item in hacker_news]
+        self.assertIn("High Score Story", titles)
+        self.assertIn("Borderline Story", titles)
+        self.assertNotIn("Low Score Story", titles)
+
     def test_build_newspaper_uses_ai_dedup_for_single_feed(self):
         articles = [
             {"title": "Alpha Story", "summary": "Alpha", "link": "http://a.com"},

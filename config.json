@@ -37,7 +37,8 @@
   "hacker_news": {
     "enabled": true,
     "title": "Hacker News Top Stories",
-    "max_items": 20
+    "max_items": 20,
+    "min_score": 100
   },
   "sections": [
     {

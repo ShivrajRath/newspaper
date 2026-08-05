@@ -324,6 +324,7 @@ def fetch_hacker_news(hn_config):
         return []
 
     max_items = hn_config.get("max_items", 5)
+    min_score = hn_config.get("min_score", 0)
     try:
         with safe_urlopen("https://hacker-news.firebaseio.com/v0/topstories.json", timeout=15) as req:
             top_ids = json.loads(req.read().decode())[:max_items]
@@ -343,11 +344,12 @@ def fetch_hacker_news(hn_config):
 
         hacker_news = []
         for item in raw_hn_items:
-            hacker_news.append({
-                "title": item["title"],
-                "url": item["url"],
-                "score": item["score"]
-            })
+            if item["score"] >= min_score:
+                hacker_news.append({
+                    "title": item["title"],
+                    "url": item["url"],
+                    "score": item["score"]
+                })
 
         return hacker_news
     except Exception as e:

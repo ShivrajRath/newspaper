@@ -35,7 +35,8 @@ To add new news categories, RSS feeds, or stocks, simply edit `config.json`:
   "hacker_news": {
     "enabled": true,
     "title": "Hacker News Top Stories",
-    "max_items": 5
+    "max_items": 5,
+    "min_score": 100
   },
   "sections": [
     {
