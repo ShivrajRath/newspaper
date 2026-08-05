@@ -1,0 +1,16 @@
+# Python virtual environment
+.venv/
+
+# Bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Generated output
+newspaper.json
+
+# macOS files
+.DS_Store
+
+# Editor directories
+.vscode/

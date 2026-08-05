@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Daily Brief</title>
+    <style>
+        :root {
+            --bg-color: #fdfbf7;
+            --card-bg: #ffffff;
+            --text-color: #111111;
+            --border-color: #d1cdb8;
+            --accent-color: #0056b3;
+            --ticker-bg: #eee8d5;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 30px 20px;
+            line-height: 1.6;
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 3px double var(--text-color);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            font-family: 'Times New Roman', serif;
+            font-size: 3.2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0;
+        }
+
+        .meta-line {
+            font-style: italic;
+            font-size: 0.95rem;
+            color: #555;
+            margin-top: 5px;
+        }
+
+        .ticker-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            gap: 12px;
+            background-color: var(--ticker-bg);
+            padding: 10px 15px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.88rem;
+            font-weight: 600;
+            border-radius: 4px;
+            margin-bottom: 30px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 22px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.03);
+        }
+
+        .card h2 {
+            font-size: 1.35rem;
+            margin-top: 0;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--text-color);
+            padding-bottom: 5px;
+        }
+
+        .summary-body {
+            font-size: 0.98rem;
+            margin-bottom: 15px;
+        }
+
+        .article-links {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.88rem;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 10px;
+        }
+
+        .article-links a {
+            color: var(--accent-color);
+            text-decoration: none;
+            display: block;
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+
+        .article-links a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 500px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2.2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>The Daily Brief</h1>
+        <div class="meta-line" id="gen-date">Loading publication date...</div>
+    </header>
+
+    <div class="ticker-bar" id="ticker-bar">Loading market data...</div>
+
+    <div class="grid" id="content-grid">Loading articles...</div>
+
+    <script>
+        async function loadNewspaper() {
+            try {
+                const response = await fetch('newspaper.json');
+                const data = await response.json();
+
+                document.getElementById('gen-date').textContent = `Edition: ${data.generated_at || data.date || 'Unknown'}`;
+
+                // Render Market Ticker Bar
+                const tickerHTML = Object.entries(data.market || {})
+                    .map(([symbol, value]) => `<span><strong>${symbol}:</strong> ${value}</span>`)
+                    .join('');
+                document.getElementById('ticker-bar').innerHTML = tickerHTML || '<span>Market data unavailable</span>';
+
+                // Helper to strip HTML tags and remove empty bullet-only lines
+                const stripHtml = (s) => {
+                    if (!s) return '';
+                    // remove anchor tags but keep inner text
+                    s = s.replace(/<a[^>]*>(.*?)<\/a>/gi, '$1');
+                    // remove remaining tags
+                    s = s.replace(/<[^>]+>/g, ' ');
+                    // normalize whitespace
+                    s = s.replace(/\s+/g, ' ').trim();
+                    // remove lines that are only bullets or dashes
+                    const lines = s.split(/\n|\\r/).map(l => l.trim()).filter(l => {
+                        return !(l === '•' || l === '-' || /^[-•*\s]+$/.test(l) || l === '');
+                    });
+                    return lines.join('\n');
+                };
+
+                // Render News Categories
+                let gridHTML = Object.entries(data.categories || {}).map(([catName, details]) => {
+                    const articlesHTML = (details.articles || []).map(art => {
+                        const t = stripHtml(art.title) || 'Untitled';
+                        const summ = stripHtml(art.summary);
+                        return `<div><strong>${t}</strong>${summ ? `<p>${summ}</p>` : ''}</div>`;
+                    }).join('');
+                    const bodyText = stripHtml(details.summary || '');
+                    const summaryBlock = bodyText ? `<div class="summary-body">${bodyText.replace(/\n/g, '<br>')}</div>` : '';
+
+                    return `
+                        <div class="card">
+                            <h2>${catName}</h2>
+                            ${summaryBlock}
+                            <div class="article-links">${articlesHTML || '<span>No articles available from this feed.</span>'}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                // Render Hacker News Card
+                if (data.hacker_news && data.hacker_news.length > 0) {
+                    const hnItems = data.hacker_news.map(hn => {
+                        const title = stripHtml(hn.title || 'Untitled');
+                        const desc = stripHtml(hn.description || '');
+                        return `<div><strong>${title}</strong>${desc ? `<p>${desc}</p>` : ''} <small>(${hn.score} pts)</small></div>`;
+                    }).join('');
+
+                    gridHTML += `
+                        <div class="card">
+                            <h2>Hacker News Top Stories</h2>
+                            <div class="article-links" style="border-top: none; padding-top: 0;">${hnItems}</div>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('content-grid').innerHTML = gridHTML;
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('content-grid').innerHTML = `
+                    <div class="card" style="grid-column: 1 / -1;">
+                        <h2>Unable to load newspaper</h2>
+                        <p>Please ensure <code>newspaper.json</code> has been generated and pushed to the repository.</p>
+                    </div>
+                `;
+            }
+        }
+
+        loadNewspaper();
+    </script>
+</body>
+
+</html>
