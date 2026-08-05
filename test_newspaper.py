@@ -1,5 +1,6 @@
 import os
 import json
+import sys
 import unittest
 from unittest.mock import patch
 import build_newspaper as builder_module
@@ -10,6 +11,7 @@ from build_newspaper import (
     ai_deduplicate_articles,
     summarize_hn_stories_batched,
     build_newspaper,
+    fetch_market_data,
 )
 
 
@@ -101,6 +103,20 @@ class TestNewspaperBuilder(unittest.TestCase):
         self.assertIn("High Score Story", titles)
         self.assertIn("Borderline Story", titles)
         self.assertNotIn("Low Score Story", titles)
+
+    def test_fetch_market_data_falls_back_to_google_finance(self):
+        html_payload = """
+        <html><body>
+            <div class="YMlKec fxKbKc">123.45</div>
+            <div class="P6K39c">+1.23%</div>
+        </body></html>
+        """
+
+        with patch.dict(sys.modules, {"yfinance": None}), \
+             patch.object(builder_module, "safe_fetch_url", return_value=html_payload.encode("utf-8")):
+            market_data = fetch_market_data({"enabled": True, "tickers": [{"symbol": "AAPL", "label": "Apple"}]})
+
+        self.assertEqual(market_data["Apple"], "$123.45 (+1.23%)")
 
     def test_build_newspaper_uses_ai_dedup_for_single_feed(self):
         articles = [

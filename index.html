@@ -5,15 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Daily Brief</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:wght@500;600;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
-            --bg-color: #fdfbf7;
-            --card-bg: #fbf9f5;
-            --text-color: #111111;
-            --border-color: #e2ded4;
-            --accent-color: #1e293b;
-            --ticker-bg: #f2ebdc;
-            --muted-text: #5f6368;
+            --bg-color: #fcfaf4;
+            --card-bg: #ffffff;
+            --text-color: #1a1a1a;
+            --border-color: #dcd6c5;
+            --accent-color: #2f3d3a;
+            --ticker-bg: #f6efe1;
+            --muted-text: #6d6759;
+            --shadow-color: rgba(26, 26, 26, 0.05);
         }
 
         * {
@@ -21,36 +27,59 @@
         }
 
         body {
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(180deg, #fcfaf4 0%, #f8f2e8 100%);
             color: var(--text-color);
             max-width: 1100px;
             margin: 0 auto;
             padding: 30px 20px 45px;
-            line-height: 1.6;
+            line-height: 1.65;
         }
 
         header {
             text-align: center;
             border-bottom: 3px double var(--accent-color);
-            padding-bottom: 15px;
+            padding-bottom: 16px;
             margin-bottom: 24px;
         }
 
         h1 {
-            font-family: 'Times New Roman', Georgia, serif;
-            font-size: 3rem;
+            font-family: "Newsreader", Georgia, serif;
+            font-size: clamp(2.4rem, 4vw, 3.3rem);
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.16em;
             margin: 0;
             color: var(--accent-color);
         }
 
         .meta-line {
-            font-style: italic;
             font-size: 0.95rem;
             color: var(--muted-text);
-            margin-top: 6px;
+            margin-top: 8px;
+        }
+
+        .header-badges {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .city-badge,
+        .edition-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.8);
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.72rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--accent-color);
         }
 
         .toolbar {
@@ -71,25 +100,26 @@
         }
 
         .quote-card {
-            background: linear-gradient(135deg, #f7efe0 0%, #fffdf8 100%);
+            background: linear-gradient(135deg, #f8efe0 0%, #fffdf8 100%);
             border: 1px solid var(--border-color);
-            border-radius: 10px;
+            border-radius: 14px;
             padding: 22px 24px;
             margin-bottom: 20px;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            box-shadow: 0 2px 10px var(--shadow-color);
         }
 
         .quote-text {
-            font-family: 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
-            font-size: 1.35rem;
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.28rem;
             font-style: italic;
             margin: 0 0 10px 0;
             line-height: 1.45;
+            color: var(--accent-color);
         }
 
         .quote-author {
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 0.9rem;
             letter-spacing: 0.08em;
             text-transform: uppercase;
@@ -100,57 +130,83 @@
         .ticker-bar {
             display: flex;
             flex-wrap: wrap;
-            justify-content: space-around;
-            gap: 12px;
+            justify-content: center;
+            gap: 10px;
             background-color: var(--ticker-bg);
-            padding: 10px 15px;
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 0.88rem;
+            padding: 12px 15px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.8rem;
             font-weight: 600;
-            border-radius: 6px;
+            letter-spacing: 0.04em;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
             margin-bottom: 28px;
         }
 
+        .ticker-bar span {
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.7);
+        }
+
         .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            align-items: start;
+            column-count: 1;
+            column-gap: 20px;
+            column-fill: balance;
         }
 
         .card {
             background: var(--card-bg);
             padding: 22px;
             border: 1px solid var(--border-color);
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+            border-radius: 12px;
+            box-shadow: 0 2px 12px var(--shadow-color);
+            margin: 0 0 20px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            display: inline-block;
+            width: 100%;
+            vertical-align: top;
         }
 
         .card h2 {
-            font-size: 1.25rem;
-            margin-top: 0;
-            margin-bottom: 10px;
-            padding-bottom: 6px;
-            border-bottom: 1px solid var(--border-color);
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.02rem;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin: 0 0 12px 0;
+            padding: 10px 0;
+            border-top: 2px solid var(--border-color);
+            border-bottom: 2px solid var(--border-color);
             color: var(--accent-color);
         }
 
         .summary-body {
-            font-size: 0.98rem;
+            font-size: 0.96rem;
             margin-bottom: 14px;
             color: var(--text-color);
         }
 
+        .lead-card .summary-body::first-letter {
+            float: left;
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 3rem;
+            line-height: 0.8;
+            margin: 0.12em 0.2em 0 0;
+            color: var(--accent-color);
+        }
+
         .article-links {
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 0.9rem;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.92rem;
             padding-top: 6px;
         }
 
         .article-links .article-item {
             margin-bottom: 12px;
             padding-bottom: 10px;
-            border-bottom: 1px solid rgba(226, 222, 212, 0.7);
+            border-bottom: 1px solid rgba(220, 214, 197, 0.75);
         }
 
         .article-links .article-item:last-child {
@@ -158,10 +214,19 @@
             padding-bottom: 0;
         }
 
+        .article-links strong {
+            display: inline-block;
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+            color: var(--text-color);
+        }
+
         .article-links p {
             margin: 4px 0 0 0;
             color: var(--muted-text);
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 0.92rem;
             line-height: 1.5;
         }
@@ -182,13 +247,13 @@
 
         @media (min-width: 900px) {
             .grid {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
+                column-count: 3;
             }
         }
 
         @media (max-width: 720px) {
             .grid {
-                grid-template-columns: 1fr;
+                column-count: 1;
             }
 
             h1 {
@@ -217,14 +282,17 @@
             .quote-card,
             .card {
                 box-shadow: none;
-                break-inside: avoid-page;
+                break-inside: avoid-column;
                 page-break-inside: avoid;
                 background: white;
+                display: block;
+                width: 100%;
             }
 
             .grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 12pt;
+                column-count: 2;
+                column-gap: 12pt;
+                column-fill: auto;
             }
 
             .article-links a {
@@ -240,6 +308,10 @@
     <header>
         <h1>The Daily Brief</h1>
         <div class="meta-line" id="gen-date">Loading publication date...</div>
+        <div class="header-badges">
+            <span class="city-badge">Dallas, TX</span>
+            <span class="edition-badge">Daily Edition</span>
+        </div>
     </header>
 
     <div class="toolbar no-print">
@@ -286,7 +358,7 @@
                 };
 
                 // Render News Categories
-                let gridHTML = Object.entries(data.categories || {}).map(([catName, details]) => {
+                let gridHTML = Object.entries(data.categories || {}).map(([catName, details], index) => {
                     const articlesHTML = (details.articles || []).map(art => {
                         const t = stripHtml(art.title) || 'Untitled';
                         const summ = stripHtml(art.summary);
@@ -297,7 +369,7 @@
                     const summaryBlock = bodyText ? `<div class="summary-body">${bodyText.replace(/\n/g, '<br>')}</div>` : '';
 
                     return `
-                        <div class="card">
+                        <div class="card${index === 0 ? ' lead-card' : ''}">
                             <h2>${catName}</h2>
                             ${summaryBlock}
                             <div class="article-links">${articlesHTML || '<span>No articles available from this section.</span>'}</div>
@@ -327,7 +399,7 @@
             } catch (err) {
                 console.error(err);
                 document.getElementById('content-grid').innerHTML = `
-                    <div class="card" style="grid-column: 1 / -1;">
+                    <div class="card">
                         <h2>Unable to load newspaper</h2>
                         <p>Please ensure <code>newspaper.json</code> has been generated and pushed to the repository.</p>
                     </div>

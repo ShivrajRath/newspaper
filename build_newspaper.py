@@ -357,6 +357,38 @@ def fetch_hacker_news(hn_config):
         return []
 
 
+def _parse_google_finance_quote(html_content, symbol):
+    """Parse a lightweight Google Finance quote page for the latest price and change."""
+    if not html_content:
+        return None
+
+    text = html_content.decode("utf-8", errors="ignore") if isinstance(html_content, bytes) else str(html_content)
+    patterns = [
+        r'(?i)<div[^>]+class="[^"]*YMlKec[^"]*"[^>]*>([0-9,\.]+)',
+        r'(?i)<div[^>]+class="[^"]*P6K39c[^"]*"[^>]*>([+-]?[0-9,\.]+%?)',
+    ]
+
+    price_match = re.search(patterns[0], text)
+    change_match = re.search(patterns[1], text)
+    if not price_match:
+        return None
+
+    price = float(price_match.group(1).replace(",", ""))
+    change_pct = 0.0
+    if change_match:
+        raw_change = change_match.group(1).replace(",", "")
+        try:
+            change_pct = float(raw_change.rstrip("%"))
+        except ValueError:
+            change_pct = 0.0
+
+    return {
+        "symbol": symbol,
+        "price": price,
+        "change_pct": change_pct,
+    }
+
+
 def fetch_market_data(market_config):
     """Fetch stock and commodity market data based on configuration."""
     if not market_config.get("enabled", True):
@@ -365,30 +397,48 @@ def fetch_market_data(market_config):
     market_data = {}
     tickers_list = market_config.get("tickers", [])
 
-    try:
-        import yfinance as yf
-        for ticker_info in tickers_list:
-            symbol = ticker_info.get("symbol")
-            label = ticker_info.get("label", symbol)
-            ticker_type = ticker_info.get("type", "stock")
+    for ticker_info in tickers_list:
+        symbol = ticker_info.get("symbol")
+        label = ticker_info.get("label", symbol)
+        ticker_type = ticker_info.get("type", "stock")
 
-            if ticker_type == "commodity":
-                continue
+        if ticker_type == "commodity":
+            continue
 
-            try:
-                stock = yf.Ticker(symbol)
-                with open(os.devnull, "w") as fnull1, open(os.devnull, "w") as fnull2:
-                    with redirect_stdout(fnull1), redirect_stderr(fnull2):
-                        hist = stock.history(period="2d")
-                if len(hist) >= 2:
-                    prev_close = hist["Close"].iloc[-2]
-                    curr = hist["Close"].iloc[-1]
-                    pct = ((curr - prev_close) / prev_close) * 100
-                    market_data[label] = f"${curr:.2f} ({'+' if pct >= 0 else ''}{pct:.2f}%)"
-            except Exception:
+        if not symbol:
+            continue
+
+        try:
+            import yfinance as yf
+            stock = yf.Ticker(symbol)
+            with open(os.devnull, "w") as fnull1, open(os.devnull, "w") as fnull2:
+                with redirect_stdout(fnull1), redirect_stderr(fnull2):
+                    hist = stock.history(period="2d")
+            if len(hist) >= 2:
+                prev_close = hist["Close"].iloc[-2]
+                curr = hist["Close"].iloc[-1]
+                pct = ((curr - prev_close) / prev_close) * 100
+                market_data[label] = f"${curr:.2f} ({'+' if pct >= 0 else ''}{pct:.2f}%)"
                 continue
-    except Exception:
-        pass
+        except Exception as exc:
+            logging.warning("yfinance lookup failed for %s: %s", symbol, exc)
+
+        try:
+            encoded_symbol = urllib.parse.quote(symbol)
+            google_url = f"https://www.google.com/finance/quote/{encoded_symbol}:NASDAQ"
+            quote_html = safe_fetch_url(google_url, timeout=10)
+            if quote_html is None:
+                raise ValueError("No response from Google Finance")
+
+            parsed_quote = _parse_google_finance_quote(quote_html, symbol)
+            if parsed_quote is None:
+                raise ValueError("Could not parse quote from Google Finance")
+
+            change_prefix = "+" if parsed_quote["change_pct"] >= 0 else ""
+            market_data[label] = f"${parsed_quote['price']:.2f} ({change_prefix}{parsed_quote['change_pct']:.2f}%)"
+        except Exception as exc:
+            logging.warning("Google Finance fallback failed for %s: %s", symbol, exc)
+            continue
 
     return market_data
 
