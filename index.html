@@ -47,6 +47,33 @@
             margin-top: 5px;
         }
 
+        .quote-card {
+            background: linear-gradient(135deg, #f8f1e1 0%, #fffdf8 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 22px 24px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .quote-text {
+            font-family: 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+            font-size: 1.45rem;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            line-height: 1.45;
+        }
+
+        .quote-author {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.9rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #666;
+            margin: 0;
+        }
+
         .ticker-bar {
             display: flex;
             flex-wrap: wrap;
@@ -124,6 +151,11 @@
         <div class="meta-line" id="gen-date">Loading publication date...</div>
     </header>
 
+    <div class="quote-card" id="quote-card">
+        <p class="quote-text" id="quote-text">Loading quote...</p>
+        <p class="quote-author" id="quote-author"></p>
+    </div>
+
     <div class="ticker-bar" id="ticker-bar">Loading market data...</div>
 
     <div class="grid" id="content-grid">Loading articles...</div>
@@ -135,6 +167,10 @@
                 const data = await response.json();
 
                 document.getElementById('gen-date').textContent = `Edition: ${data.generated_at || data.date || 'Unknown'}`;
+
+                const quote = data.quote || {};
+                document.getElementById('quote-text').textContent = quote.text || 'Make each day your masterpiece.';
+                document.getElementById('quote-author').textContent = quote.author ? `— ${quote.author}` : '';
 
                 // Render Market Ticker Bar
                 const tickerHTML = Object.entries(data.market || {})
@@ -179,7 +215,7 @@
                     const hnItems = data.hacker_news.map(hn => {
                         const title = stripHtml(hn.title || 'Untitled');
                         const desc = stripHtml(hn.description || '');
-                        const titleHTML = `<strong>${title}</strong>`;
+                        const titleHTML = `<a href="${hn.url}" target="_blank" rel="noopener noreferrer"><strong>${title}</strong></a>`;
                         return `<div class="article-item">${titleHTML}${desc ? `<p>${desc}</p>` : ''} <small style="color: #666;">(${hn.score} pts)</small></div>`;
                     }).join('');
 

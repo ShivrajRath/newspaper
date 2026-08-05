@@ -52,6 +52,26 @@ def clean_html(text):
     return html.unescape(text)
 
 
+def fetch_quote_of_day():
+    """Fetch the quote of the day from ZenQuotes with a graceful fallback."""
+    try:
+        with safe_urlopen("https://zenquotes.io/api/today", timeout=15) as req:
+            raw_data = json.loads(req.read().decode())
+            if raw_data:
+                quote_data = raw_data[0]
+                return {
+                    "text": quote_data.get("q") or "Make each day your masterpiece.",
+                    "author": quote_data.get("a") or "John Wooden"
+                }
+    except Exception as e:
+        logging.warning("Error fetching quote: %s", e)
+
+    return {
+        "text": "Make each day your masterpiece.",
+        "author": "John Wooden"
+    }
+
+
 def safe_fetch_url(url, timeout=15):
     """Safely fetch raw bytes from URL supporting SSL fallback."""
     parsed = urllib.parse.urlsplit(url)
@@ -83,7 +103,7 @@ def safe_urlopen(url, timeout=15):
     return None
 
 
-def fetch_feed_entries(url, max_items=5, max_age_days=2):
+def fetch_feed_entries(url, max_items=15, max_age_days=1):
     """Fetch recent feed entries from an RSS feed URL."""
     raw_data = safe_fetch_url(url)
     if raw_data is None:
@@ -124,7 +144,7 @@ def fetch_feed_entries(url, max_items=5, max_age_days=2):
     return articles
 
 
-def fetch_section_articles(feed_urls, max_per_feed=5):
+def fetch_section_articles(feed_urls, max_per_feed=15):
     """Fetch articles across all feed URLs specified for a section."""
     all_articles = []
     for url in feed_urls:
@@ -133,7 +153,7 @@ def fetch_section_articles(feed_urls, max_per_feed=5):
     return all_articles
 
 
-def local_deduplicate_articles(articles, max_items=4):
+def local_deduplicate_articles(articles, max_items=15):
     """Filter duplicate or near-duplicate articles using rule-based title similarity."""
     if not articles:
         return []
@@ -175,10 +195,10 @@ def local_deduplicate_articles(articles, max_items=4):
     return unique_articles[:max_items]
 
 
-def ai_deduplicate_articles(articles, category_name, max_items=4):
-    """Use Gemini AI to filter out duplicate/overlapping articles from multiple RSS feeds.
-    
-    Ensures single batched request per section to respect rate limits.
+def ai_deduplicate_articles(articles, category_name, max_items=15):
+    """Use Gemini AI to select the most relevant unique stories from a section.
+
+    Ensures a single batched request per section to respect rate limits.
     Falls back to local_deduplicate_articles on failure or if client is missing.
     """
     global client
@@ -196,7 +216,9 @@ def ai_deduplicate_articles(articles, category_name, max_items=4):
     prompt = (
         f"Category: {category_name}\n"
         f"Titles:\n{articles_str}\n\n"
-        f"Select up to {max_items} unique story indices. Remove duplicates. Return ONLY a JSON array of indices, e.g. [1, 3, 4]:"
+        f"Select up to {max_items} of the most relevant, non-overlapping stories. "
+        f"Prioritize the most important and timely stories, removing duplicates and near-duplicates. "
+        f"Return ONLY a JSON array of indices, e.g. [1, 3, 4]:"
     )
 
     try:
@@ -318,15 +340,12 @@ def fetch_hacker_news(hn_config):
                     "snippet": snippet
                 })
 
-        descriptions = summarize_hn_stories_batched(raw_hn_items)
-
         hacker_news = []
-        for idx, item in enumerate(raw_hn_items):
+        for item in raw_hn_items:
             hacker_news.append({
                 "title": item["title"],
                 "url": item["url"],
-                "score": item["score"],
-                "description": descriptions[idx] if idx < len(descriptions) else "Click link to read story."
+                "score": item["score"]
             })
 
         return hacker_news
@@ -377,6 +396,7 @@ def build_newspaper():
 
     output_content = {
         "generated_at": datetime.now().strftime("%B %d, %Y %I:%M %p"),
+        "quote": fetch_quote_of_day(),
         "categories": {},
         "market": {},
         "hacker_news": []
@@ -395,13 +415,13 @@ def build_newspaper():
             }
             continue
 
-        raw_articles = fetch_section_articles(feed_urls, max_per_feed=5)
-        
-        # Deduplicate articles using AI if multiple feeds, otherwise local deduplication
-        if len(feed_urls) > 1:
-            filtered_articles = ai_deduplicate_articles(raw_articles, sec_name, max_items=4)
+        raw_articles = fetch_section_articles(feed_urls, max_per_feed=15)
+
+        # Prefer AI selection when available; fall back to local deduplication otherwise.
+        if client:
+            filtered_articles = ai_deduplicate_articles(raw_articles, sec_name, max_items=15)
         else:
-            filtered_articles = local_deduplicate_articles(raw_articles, max_items=4)
+            filtered_articles = local_deduplicate_articles(raw_articles, max_items=15)
 
         output_content["categories"][sec_name] = {
             "summary": "",

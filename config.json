@@ -37,7 +37,7 @@
   "hacker_news": {
     "enabled": true,
     "title": "Hacker News Top Stories",
-    "max_items": 5
+    "max_items": 20
   },
   "sections": [
     {
@@ -56,11 +56,11 @@
       ]
     },
     {
-      "name": "India",
+      "name": "India & Asia",
       "feeds": [
         "http://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
-        "https://www.theguardian.com/world/india/rss",
-        "https://www.aljazeera.com/xml/rss/all.xml"
+        "https://www.aljazeera.com/xml/rss/all.xml",
+        "https://rss.dw.com/rdf/rss-en-asia"
       ]
     },
     {
@@ -80,8 +80,8 @@
     {
       "name": "Sports",
       "feeds": [
-        "https://www.theguardian.com/sport/rss",
-        "http://feeds.bbci.co.uk/sport/rss.xml"
+        "http://feeds.bbci.co.uk/sport/rss.xml",
+        "https://www.espn.com/espn/rss/news"
       ]
     },
     {

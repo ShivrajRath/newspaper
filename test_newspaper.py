@@ -1,6 +1,8 @@
 import os
 import json
 import unittest
+from unittest.mock import patch
+import build_newspaper as builder_module
 from build_newspaper import (
     load_config,
     clean_html,
@@ -65,6 +67,48 @@ class TestNewspaperBuilder(unittest.TestCase):
         self.assertTrue(summaries[0].startswith("This is a great new app"))
         self.assertEqual(summaries[1], "Click link to read story.")
 
+    def test_build_newspaper_uses_ai_dedup_for_single_feed(self):
+        articles = [
+            {"title": "Alpha Story", "summary": "Alpha", "link": "http://a.com"},
+            {"title": "Beta Story", "summary": "Beta", "link": "http://b.com"},
+            {"title": "Gamma Story", "summary": "Gamma", "link": "http://c.com"},
+        ]
+
+        class FakeResponse:
+            text = "[1, 3]"
+
+        class FakeClient:
+            class Models:
+                @staticmethod
+                def generate_content(*args, **kwargs):
+                    return FakeResponse()
+
+            models = Models()
+
+        config = {
+            "sections": [{"name": "Tech", "feeds": ["http://example.com/rss.xml"]}],
+            "hacker_news": {"enabled": False},
+            "market": {"enabled": False},
+        }
+
+        with patch.object(builder_module, "load_config", return_value=config), \
+             patch.object(builder_module, "fetch_section_articles", return_value=articles), \
+             patch.object(builder_module, "fetch_quote_of_day", return_value={"text": "", "author": ""}), \
+             patch.object(builder_module, "fetch_hacker_news", return_value=[]), \
+             patch.object(builder_module, "fetch_market_data", return_value={}):
+            original_client = builder_module.client
+            builder_module.client = FakeClient()
+            try:
+                builder_module.build_newspaper()
+            finally:
+                builder_module.client = original_client
+
+        with open("newspaper.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        selected_titles = [article["title"] for article in data["categories"]["Tech"]["articles"]]
+        self.assertEqual(selected_titles, ["Alpha Story", "Gamma Story"])
+
     def test_newspaper_json_structure(self):
         build_newspaper()
         self.assertTrue(os.path.exists("newspaper.json"))
@@ -74,6 +118,7 @@ class TestNewspaperBuilder(unittest.TestCase):
         self.assertIn("categories", data)
         self.assertIn("market", data)
         self.assertIn("hacker_news", data)
+        self.assertIn("quote", data)
 
 
 if __name__ == "__main__":
