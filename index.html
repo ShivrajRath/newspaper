@@ -186,6 +186,16 @@
             column-fill: balance;
         }
 
+        .end-sign {
+            text-align: center;
+            font-family: "Newsreader", Georgia, serif;
+            color: var(--muted-text);
+            margin: 28px 0 8px;
+            font-size: 0.98rem;
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
+        }
+
         .card {
             background: var(--card-bg);
             padding: 22px;
@@ -366,6 +376,8 @@
     <div class="ticker-bar" id="ticker-bar">Loading market data...</div>
 
     <div class="grid" id="content-grid">Loading articles...</div>
+
+    <div class="end-sign" id="end-sign">— End of Paper —</div>
 
     <script>
         async function loadNewspaper() {
