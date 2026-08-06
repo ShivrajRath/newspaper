@@ -302,18 +302,20 @@ def safe_fetch_url(url, timeout=15):
 
 
 def safe_urlopen(url, timeout=15):
-    """Safely open URL returning response handle."""
+    """Safely open URL returning response handle. Raises ConnectionError if all attempts fail."""
     parsed = urllib.parse.urlsplit(url)
     query = urllib.parse.quote(parsed.query, safe='=&|:+()') if parsed.query else ''
     safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment))
     request = urllib.request.Request(safe_url, headers={"User-Agent": "Mozilla/5.0"})
 
+    last_exc = None
     for ctx in (ssl.create_default_context(), ssl._create_unverified_context()):
         try:
             return urllib.request.urlopen(request, timeout=timeout, context=ctx)
-        except Exception:
+        except Exception as exc:
+            last_exc = exc
             continue
-    return None
+    raise ConnectionError(f"Failed to open URL {url}: {last_exc}")
 
 
 def fetch_feed_entries(url, max_items=15, max_age_days=1):

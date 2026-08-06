@@ -6,7 +6,7 @@ on:
       - main
   workflow_dispatch:
   schedule:
-    - cron: "0 10 * * *" # Runs at 5:00 AM Central Time (CDT/UTC-5)
+    - cron: "0 11 * * *" # Runs at 5:00 AM CST (UTC-6) / 6:00 AM CDT (UTC-5) — closest year-round approximation
 
 permissions:
   contents: read
