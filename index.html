@@ -315,12 +315,13 @@
         @media print {
             @page {
                 size: A4;
-                margin: 12mm;
+                margin: 10mm;
             }
 
             body {
                 max-width: none;
                 padding: 0;
+                margin: 0;
                 background: white;
                 color: #111;
                 font-size: 10.5pt;
@@ -338,13 +339,51 @@
                 background: white;
                 display: block;
                 width: 100%;
+                border: none;
+                border-radius: 0;
+                margin: 0 0 10px 0;
+                padding: 8px 6px 10px 6px;
+                border-bottom: 1px solid rgba(0,0,0,0.06);
             }
 
+            /* Use a single stacked column for print so each section uses full width */
             .grid {
-                column-count: 2;
-                column-gap: 12pt;
+                column-count: 1;
+                column-gap: 0;
                 column-fill: auto;
             }
+
+            /* Reduce spacing inside lists and article items */
+            .article-links .article-item {
+                margin-bottom: 8px;
+                padding-bottom: 6px;
+                border-bottom: 1px solid rgba(220, 214, 197, 0.35);
+            }
+
+            .ticker-bar {
+                padding: 6px 8px;
+                margin-bottom: 8px;
+            }
+
+            .quote-card {
+                padding: 8px 6px;
+                margin-bottom: 6px;
+            }
+
+            .end-sign {
+                margin: 8px 0 6px;
+                font-size: 0.9rem;
+            }
+
+            /* Remove decorative borders from section headers in print */
+            .card h2 {
+                border-top: none;
+                border-bottom: none;
+                padding: 6px 0;
+                margin-bottom: 6px;
+            }
+
+            /* Page numbers removed for print view */
 
             .article-links a {
                 color: #111;
@@ -377,6 +416,8 @@
     <div class="grid" id="content-grid">Loading articles...</div>
 
     <div class="end-sign" id="end-sign">— End of Paper —</div>
+
+    <div class="print-footer" aria-hidden="true"></div>
 
     <script>
         async function loadNewspaper() {
