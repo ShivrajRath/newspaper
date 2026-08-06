@@ -53,6 +53,87 @@ def clean_html(text):
     return html.unescape(text)
 
 
+# WMO Weather Interpretation Codes → (description, emoji)
+WMO_CODES = {
+    0: ("Clear sky", "☀️"),
+    1: ("Mainly clear", "🌤️"),
+    2: ("Partly cloudy", "⛅"),
+    3: ("Overcast", "☁️"),
+    45: ("Foggy", "🌫️"),
+    48: ("Icy fog", "🌫️"),
+    51: ("Light drizzle", "🌦️"),
+    53: ("Moderate drizzle", "🌦️"),
+    55: ("Dense drizzle", "🌧️"),
+    61: ("Slight rain", "🌧️"),
+    63: ("Moderate rain", "🌧️"),
+    65: ("Heavy rain", "🌧️"),
+    71: ("Slight snow", "❄️"),
+    73: ("Moderate snow", "❄️"),
+    75: ("Heavy snow", "❄️"),
+    80: ("Slight showers", "🌦️"),
+    81: ("Moderate showers", "🌦️"),
+    82: ("Heavy showers", "⛈️"),
+    95: ("Thunderstorm", "⛈️"),
+    96: ("Thunderstorm w/ hail", "⛈️"),
+    99: ("Thunderstorm w/ heavy hail", "⛈️"),
+}
+
+# Curated word list for fallback (one per day-of-year, cycling)
+FALLBACK_WORDS = [
+    "ephemeral", "sonder", "serendipity", "melancholy", "luminous",
+    "petrichor", "ineffable", "soliloquy", "halcyon", "querulous",
+    "fugacious", "sempiternal", "laconic", "perspicacious", "ebullient",
+    "recondite", "sanguine", "tenacious", "veracious", "whimsical",
+    "zealous", "arcane", "benevolent", "cogent", "dauntless",
+    "eloquent", "fastidious", "grandiose", "heuristic", "indefatigable",
+]
+
+FALLBACK_PUZZLES = [
+    {
+        "type": "riddle",
+        "question": "I speak without a mouth and hear without ears. I have no body, but I come alive with the wind. What am I?",
+        "answer": "An echo",
+        "hint": "Think about sound bouncing back to you in a canyon."
+    },
+    {
+        "type": "riddle",
+        "question": "The more you take, the more you leave behind. What am I?",
+        "answer": "Footsteps",
+        "hint": "Think about walking on a trail."
+    },
+    {
+        "type": "riddle",
+        "question": "I have cities, but no houses live there. I have mountains, but no trees grow there. I have water, but no fish swim there. I have roads, but no cars drive there. What am I?",
+        "answer": "A map",
+        "hint": "You unfold me to find your way."
+    },
+    {
+        "type": "riddle",
+        "question": "What has hands but can't clap?",
+        "answer": "A clock",
+        "hint": "It helps you keep track of time."
+    },
+    {
+        "type": "riddle",
+        "question": "What gets wetter the more it dries?",
+        "answer": "A towel",
+        "hint": "You use it after a shower."
+    },
+    {
+        "type": "riddle",
+        "question": "I'm light as a feather, yet the strongest man can't hold me for more than a minute. What am I?",
+        "answer": "Breath",
+        "hint": "You do it automatically, all the time."
+    },
+    {
+        "type": "riddle",
+        "question": "What begins with T, ends with T, and has T in it?",
+        "answer": "A teapot",
+        "hint": "You boil water to use it."
+    },
+]
+
+
 def fetch_quote_of_day():
     """Fetch the quote of the day from ZenQuotes with a graceful fallback."""
     try:
@@ -71,6 +152,137 @@ def fetch_quote_of_day():
         "text": "Make each day your masterpiece.",
         "author": "John Wooden"
     }
+
+
+def fetch_weather():
+    """Fetch current weather for Frisco, TX using Open-Meteo (free, no key required)."""
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        "?latitude=33.1507&longitude=-96.8236"
+        "&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
+        "wind_speed_10m,weather_code,precipitation"
+        "&temperature_unit=fahrenheit&wind_speed_unit=mph"
+        "&timezone=America%2FChicago"
+    )
+    try:
+        with safe_urlopen(url, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+            curr = data.get("current", {})
+            code = curr.get("weather_code", 0)
+            desc, emoji = WMO_CODES.get(code, ("Unknown", "🌡️"))
+            return {
+                "temperature_f": round(curr.get("temperature_2m", 0)),
+                "feels_like_f": round(curr.get("apparent_temperature", 0)),
+                "humidity": curr.get("relative_humidity_2m", 0),
+                "wind_mph": round(curr.get("wind_speed_10m", 0), 1),
+                "precipitation_mm": curr.get("precipitation", 0),
+                "condition": desc,
+                "emoji": emoji,
+                "location": "Frisco, TX"
+            }
+    except Exception as e:
+        logging.warning("Error fetching weather: %s", e)
+        return {
+            "temperature_f": None,
+            "condition": "Unavailable",
+            "emoji": "🌡️",
+            "location": "Frisco, TX"
+        }
+
+
+def fetch_word_of_day():
+    """Generate Word of the Day using Gemini AI, with Free Dictionary API fallback."""
+    global client
+
+    # Try Gemini AI first
+    if client:
+        prompt = (
+            "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. "
+            "Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: "
+            '{"word": "...", "part_of_speech": "...", "definition": "...", "example": "..."}'
+            " where example is a short illustrative sentence using the word."
+        )
+        try:
+            time.sleep(1)
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt
+            )
+            match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
+            if match:
+                parsed = json.loads(match.group(0))
+                if all(k in parsed for k in ("word", "part_of_speech", "definition", "example")):
+                    logging.info("Word of the day from AI: %s", parsed["word"])
+                    return parsed
+        except Exception as e:
+            err_str = str(e)
+            if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
+                logging.warning("Gemini AI API error (%s). Disabling AI.", e)
+                client = None
+            else:
+                logging.warning("AI word-of-day failed: %s. Falling back.", e)
+
+    # Fallback: pick word from curated list by day-of-year, look up definition
+    day_of_year = datetime.now().timetuple().tm_yday
+    word = FALLBACK_WORDS[day_of_year % len(FALLBACK_WORDS)]
+    try:
+        with safe_urlopen(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=10) as resp:
+            entries = json.loads(resp.read().decode())
+            if entries and isinstance(entries, list):
+                entry = entries[0]
+                meanings = entry.get("meanings", [])
+                if meanings:
+                    m = meanings[0]
+                    defs = m.get("definitions", [])
+                    definition = defs[0].get("definition", "") if defs else ""
+                    example = defs[0].get("example", "") if defs else ""
+                    return {
+                        "word": word,
+                        "part_of_speech": m.get("partOfSpeech", ""),
+                        "definition": definition,
+                        "example": example
+                    }
+    except Exception as e:
+        logging.warning("Dictionary API fallback failed for '%s': %s", word, e)
+
+    return {"word": word, "part_of_speech": "", "definition": "", "example": ""}
+
+
+def fetch_daily_puzzle():
+    """Generate a daily puzzle (riddle or trivia) using Gemini AI, with a fallback."""
+    global client
+
+    if client:
+        prompt = (
+            "Generate a fun, clever daily puzzle for a newspaper. "
+            "It should be a riddle or lateral-thinking question that is not too easy and not too hard. "
+            "Return ONLY a JSON object with exactly these fields: "
+            '{"type": "riddle", "question": "...", "answer": "...", "hint": "..."}'
+            " Keep the question under 30 words, and the answer under 6 words."
+        )
+        try:
+            time.sleep(1)
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt
+            )
+            match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
+            if match:
+                parsed = json.loads(match.group(0))
+                if all(k in parsed for k in ("type", "question", "answer", "hint")):
+                    logging.info("Daily puzzle from AI: %s", parsed["question"][:40])
+                    return parsed
+        except Exception as e:
+            err_str = str(e)
+            if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
+                logging.warning("Gemini AI API error (%s). Disabling AI.", e)
+                client = None
+            else:
+                logging.warning("AI puzzle generation failed: %s. Falling back.", e)
+
+    # Fallback: pick from curated list by day-of-year
+    day_of_year = datetime.now().timetuple().tm_yday
+    return FALLBACK_PUZZLES[day_of_year % len(FALLBACK_PUZZLES)]
 
 
 def safe_fetch_url(url, timeout=15):
@@ -450,6 +662,9 @@ def build_newspaper():
     output_content = {
         "generated_at": datetime.now().strftime("%B %d, %Y %I:%M %p"),
         "quote": fetch_quote_of_day(),
+        "weather": fetch_weather(),
+        "word_of_the_day": fetch_word_of_day(),
+        "puzzle": fetch_daily_puzzle(),
         "categories": {},
         "market": {},
         "hacker_news": []

@@ -336,14 +336,14 @@
                 box-shadow: none;
                 break-inside: avoid-column;
                 page-break-inside: avoid;
-                background: white;
+                /* Strip all colored backgrounds and borders — flat white */
+                background: white !important;
                 display: block;
                 width: 100%;
-                border: none;
+                border: none !important;
                 border-radius: 0;
                 margin: 0 0 10px 0;
                 padding: 8px 6px 10px 6px;
-                border-bottom: 1px solid rgba(0,0,0,0.06);
             }
 
             /* Use a single stacked column for print so each section uses full width */
@@ -375,21 +375,219 @@
                 font-size: 0.9rem;
             }
 
-            /* Remove decorative borders from section headers in print */
+            /* Section headers: keep only a top rule as the delimiter */
             .card h2 {
-                border-top: none;
+                border-top: 1.5px solid #aaa;
                 border-bottom: none;
                 padding: 6px 0;
                 margin-bottom: 6px;
             }
 
-            /* Page numbers removed for print view */
+            /* Strip weather/puzzle card coloured stat boxes */
+            .weather-stat {
+                background: transparent !important;
+                border: none !important;
+            }
+
+            /* Hide puzzle interactive buttons and answer/hint in print */
+            .puzzle-hint-toggle,
+            .puzzle-reveal-btn,
+            .puzzle-hint-text,
+            .puzzle-answer-text,
+            .puzzle-type-badge {
+                display: none !important;
+            }
 
             .article-links a {
                 color: #111;
                 text-decoration: none;
             }
         }
+        /* ── Weather Card ───────────────────────────────────── */
+        .weather-card {
+            background: linear-gradient(135deg, #e8f4fd 0%, #f0f8ff 100%);
+            border: 1px solid #b8d8f0;
+        }
+
+        .weather-main {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 16px;
+        }
+
+        .weather-emoji {
+            font-size: 3.2rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .weather-temp {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 2.8rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            line-height: 1;
+        }
+
+        .weather-condition {
+            font-size: 1rem;
+            color: var(--muted-text);
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .weather-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .weather-stat {
+            background: rgba(255,255,255,0.75);
+            border: 1px solid rgba(184, 216, 240, 0.7);
+            border-radius: 10px;
+            padding: 10px 12px;
+            text-align: center;
+        }
+
+        .weather-stat-label {
+            font-size: 0.7rem;
+            font-family: "JetBrains Mono", monospace;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--muted-text);
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .weather-stat-value {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        /* ── Word of the Day Card ───────────────────────────── */
+        .wotd-word {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            margin: 0 0 2px 0;
+            line-height: 1.1;
+        }
+
+        .wotd-pos {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.78rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--muted-text);
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        .wotd-definition {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-color);
+            margin-bottom: 10px;
+        }
+
+        .wotd-example {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 0.93rem;
+            font-style: italic;
+            color: var(--muted-text);
+            border-left: 3px solid var(--border-color);
+            padding-left: 12px;
+            margin: 0;
+        }
+
+        /* ── Puzzle Card ────────────────────────────────────── */
+        .puzzle-card {
+            background: linear-gradient(135deg, #fdf8e8 0%, #fffdf5 100%);
+            border: 1px solid #e2d4a0;
+        }
+
+        .puzzle-type-badge {
+            display: inline-block;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: #8b6914;
+            background: rgba(226, 212, 160, 0.45);
+            border: 1px solid rgba(226, 212, 160, 0.8);
+            border-radius: 999px;
+            padding: 3px 10px;
+            margin-bottom: 14px;
+        }
+
+        .puzzle-question {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.08rem;
+            line-height: 1.6;
+            color: var(--accent-color);
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .puzzle-hint-toggle {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.78rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted-text);
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 5px 14px;
+            cursor: pointer;
+            margin-right: 8px;
+            transition: background 0.2s;
+        }
+
+        .puzzle-hint-toggle:hover {
+            background: rgba(220, 214, 197, 0.35);
+        }
+
+        .puzzle-reveal-btn {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.78rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: white;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 999px;
+            padding: 5px 14px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .puzzle-reveal-btn:hover {
+            opacity: 0.85;
+        }
+
+        .puzzle-hint-text {
+            font-size: 0.88rem;
+            color: var(--muted-text);
+            font-style: italic;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .puzzle-answer-text {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #1f6d33;
+            margin-top: 12px;
+            display: none;
+        }
+
     </style>
 </head>
 
@@ -504,7 +702,70 @@
                     `;
                 }
 
-                document.getElementById('content-grid').innerHTML = gridHTML;
+                // ── Render Extras (Weather · Word of Day · Puzzle) ──
+                let extrasHTML = '';
+
+                // Weather Card
+                const wx = data.weather || {};
+                if (wx.temperature_f !== undefined && wx.temperature_f !== null) {
+                    const feelsLike = wx.feels_like_f != null ? `<span class="weather-stat-label">Feels Like</span><span class="weather-stat-value">${wx.feels_like_f}°F</span>` : '';
+                    const humidity  = wx.humidity    != null ? `<span class="weather-stat-label">Humidity</span><span class="weather-stat-value">${wx.humidity}%</span>` : '';
+                    const wind      = wx.wind_mph    != null ? `<span class="weather-stat-label">Wind</span><span class="weather-stat-value">${wx.wind_mph} mph</span>` : '';
+                    extrasHTML += `
+                        <div class="card weather-card">
+                            <h2>📍 ${wx.location || 'Frisco, TX'} Weather</h2>
+                            <div class="weather-main">
+                                <span class="weather-emoji">${wx.emoji || '🌡️'}</span>
+                                <div>
+                                    <div class="weather-temp">${wx.temperature_f}°F</div>
+                                    <div class="weather-condition">${wx.condition || ''}</div>
+                                </div>
+                            </div>
+                            <div class="weather-stats">
+                                ${feelsLike ? `<div class="weather-stat">${feelsLike}</div>` : ''}
+                                ${humidity  ? `<div class="weather-stat">${humidity}</div>` : ''}
+                                ${wind      ? `<div class="weather-stat">${wind}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Word of the Day Card
+                const wotd = data.word_of_the_day || {};
+                if (wotd.word) {
+                    const posHtml   = wotd.part_of_speech ? `<span class="wotd-pos">${wotd.part_of_speech}</span>` : '';
+                    const defHtml   = wotd.definition ? `<p class="wotd-definition">${wotd.definition}</p>` : '';
+                    const exHtml    = wotd.example    ? `<p class="wotd-example">“${wotd.example}”</p>` : '';
+                    extrasHTML += `
+                        <div class="card">
+                            <h2>📖 Word of the Day</h2>
+                            <p class="wotd-word">${wotd.word}</p>
+                            ${posHtml}
+                            ${defHtml}
+                            ${exHtml}
+                        </div>
+                    `;
+                }
+
+                // Daily Puzzle Card
+                const puzzle = data.puzzle || {};
+                if (puzzle.question) {
+                    extrasHTML += `
+                        <div class="card puzzle-card">
+                            <h2>🧩 Daily Puzzle</h2>
+                            <span class="puzzle-type-badge">${puzzle.type || 'Riddle'}</span>
+                            <p class="puzzle-question">${puzzle.question}</p>
+                            <div>
+                                <button class="puzzle-hint-toggle" id="hint-btn" onclick="toggleHint()">Show Hint</button>
+                                <button class="puzzle-reveal-btn" id="reveal-btn" onclick="revealAnswer()">Reveal Answer</button>
+                            </div>
+                            <p class="puzzle-hint-text" id="puzzle-hint">💡 ${puzzle.hint || ''}</p>
+                            <p class="puzzle-answer-text" id="puzzle-answer">✔ ${puzzle.answer || ''}</p>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('content-grid').innerHTML = gridHTML + extrasHTML;
 
             } catch (err) {
                 console.error(err);
@@ -515,6 +776,22 @@
                     </div>
                 `;
             }
+        }
+
+        function toggleHint() {
+            const el = document.getElementById('puzzle-hint');
+            const btn = document.getElementById('hint-btn');
+            const shown = el.style.display === 'block';
+            el.style.display = shown ? 'none' : 'block';
+            btn.textContent = shown ? 'Show Hint' : 'Hide Hint';
+        }
+
+        function revealAnswer() {
+            const el = document.getElementById('puzzle-answer');
+            const btn = document.getElementById('reveal-btn');
+            el.style.display = 'block';
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
         }
 
         loadNewspaper();
