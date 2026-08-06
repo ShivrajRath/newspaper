@@ -1,106 +1,46 @@
-# The Daily Brief - Automated Newspaper Generator
+# The Daily Brief
 
-A modern, highly customizable automated newspaper generator. It fetches news from RSS feeds, Hacker News, and financial market tickers, formats them into a clean JSON structure (`newspaper.json`), and renders an elegant daily brief interface (`index.html`).
-
----
-
-## Features
-
-- **Declarative Configuration (`config.json`)**: Easily configure news sections, multiple RSS feeds per section, Hacker News settings, and stock pickers without modifying any Python code.
-- **Multi-Feed RSS Aggregation**: Under any section, specify one or multiple RSS feeds.
-- **AI-Powered Deduplication**: Automatically filters out duplicate or overlapping news stories when multiple RSS feeds are configured under a section using Google Gemini AI. Includes a rule-based fuzzy matching fallback if Gemini API is disabled or rate-limited.
-- **Strict AI Rate-Limit Compliance**: Ensures AI operations remain well within Gemini rate limits (max 15 calls/min) by batching requests (e.g. 1 call per section deduplication, 1 call for Hacker News summaries).
-- **Automated Market Tickers**: Supports stock market tickers using `yfinance` without relying on Google Finance fallback.
-- **Responsive Daily Brief Dashboard**: Renders articles and market data seamlessly in `index.html`.
+**A personal newspaper for the things that actually matter — built for focus, not feeds.**
 
 ---
 
-## Configuration (`config.json`)
+The internet is full of noise. Infinite scrolls, clickbait, and algorithmic feeds engineered to keep you hooked.
 
-To add new news categories, RSS feeds, or stocks, simply edit `config.json`:
+**The Daily Brief** is the antidote. Once a day, it quietly pulls together news from the sources *you* choose — world news, tech, markets, Hacker News — and lays it out as a clean, readable newspaper. No recommendations. No notifications. No doomscrolling. Just today's brief, ready when you are.
 
-```json
-{
-  "market": {
-    "enabled": true,
-    "tickers": [
-      {
-        "symbol": "AAPL",
-        "label": "AAPL",
-        "type": "stock",
-        "exchange": "NASDAQ"
-      }
-    ]
-  },
-  "hacker_news": {
-    "enabled": true,
-    "title": "Hacker News Top Stories",
-    "max_items": 5,
-    "min_score": 100
-  },
-  "sections": [
-    {
-      "name": "World News",
-      "feeds": [
-        "http://feeds.bbci.co.uk/news/world/rss.xml",
-        "https://www.theguardian.com/world/rss"
-      ]
-    },
-    {
-      "name": "Science & Tech",
-      "feeds": [
-        "https://www.sciencedaily.com/rss/top/science.xml",
-        "https://feeds.arstechnica.com/arstechnica/index"
-      ]
-    }
-  ]
-}
-```
+You read it, you close it, you move on with your day.
 
 ---
 
-## Getting Started
+## What it does
 
-### 1. Requirements & Setup
+- Fetches headlines from RSS feeds you configure
+- Pulls top Hacker News stories (above a score threshold you set)
+- Shows live market data for stocks you care about
+- Deduplicates stories so you're not reading the same news twice
+- Renders everything as a single clean page — one newspaper, one day
 
-Create and activate a virtual environment, then install dependencies:
+---
+
+## Quickstart
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# Install dependencies
+python3 -m venv .venv && source .venv/bin/activate
 pip install feedparser yfinance google-genai
-```
 
-### 2. Set Up Gemini API Key (Optional)
-
-To enable AI deduplication and batch summarization:
-
-```bash
-export GEMINI_API_KEY="your_api_key_here"
-# Optional: specify model (defaults to gemini-3.5-flash)
-export GEMINI_MODEL="gemini-3.5-flash"
-```
-
-_Note: If no API key is set, the application automatically uses smart local fuzzy matching deduplication and sentence extraction fallbacks._
-
-### 3. Build the Newspaper
-
-Generate `newspaper.json`:
-
-```bash
+# Build today's newspaper
 python3 build_newspaper.py
+
+# Open index.html in your browser
 ```
 
-### 4. View in Browser
-
-Open `index.html` in your web browser.
+Optionally, set a `GEMINI_API_KEY` to enable smarter deduplication. Without it, a local fuzzy-matching fallback is used automatically.
 
 ---
 
-## Running Unit Tests
+## Configuration
 
-Run the test suite using `unittest`:
+Edit `config.json` to choose your news sources, stocks, and Hacker News settings. No code changes needed.
 
-```bash
-python3 -m unittest test_newspaper.py
-```
+See [DEVELOPER.md](DEVELOPER.md) for architecture details, technical docs, and how to contribute.
