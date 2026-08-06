@@ -432,6 +432,8 @@
                         const titleHTML = `<strong>${t}</strong>`;
                         return `<div class="article-item">${titleHTML}${summ ? `<p>${summ}</p>` : ''}</div>`;
                     }).join('');
+                    if (!articlesHTML) return '';
+
                     const bodyText = stripHtml(details.summary || '');
                     const summaryBlock = bodyText ? `<div class="summary-body">${bodyText.replace(/\n/g, '<br>')}</div>` : '';
 
@@ -439,7 +441,7 @@
                         <div class="card${index === 0 ? ' lead-card' : ''}">
                             <h2>${catName}</h2>
                             ${summaryBlock}
-                            <div class="article-links">${articlesHTML || '<span>No articles available from this section.</span>'}</div>
+                            <div class="article-links">${articlesHTML}</div>
                         </div>
                     `;
                 }).join('');
