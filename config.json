@@ -66,7 +66,11 @@
     },
     {
       "name": "Business & Markets",
-      "feeds": ["https://feeds.content.dowjones.io/public/rss/mw_topstories"]
+      "feeds": [
+        "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+        "https://finance.yahoo.com/news/rssindex",
+        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
+      ]
     },
     {
       "name": "Science & Tech",
