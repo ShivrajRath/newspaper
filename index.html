@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">Loading date...</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23111111'/><path d='M28 25 h44 a5 5 0 0 1 5 5 v40 a5 5 0 0 1 -5 5 h-44 a5 5 0 0 1 -5 -5 v-40 a5 5 0 0 1 5 -5 Z' fill='%23fdfbf7'/><line x1='35' y1='36' x2='65' y2='36' stroke='%23111111' stroke-width='4' stroke-linecap='round'/><line x1='35' y1='46' x2='65' y2='46' stroke='%23111111' stroke-width='4' stroke-linecap='round'/><line x1='35' y1='56' x2='53' y2='56' stroke='%23111111' stroke-width='4' stroke-linecap='round'/></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23111111'/><path d='M28 25 h44 a5 5 0 0 1 5 5 v40 a5 5 0 0 1 -5 5 h-44 a5 5 0 0 1 -5 -5 v-40 a5 5 0 0 1 5 -5 Z' fill='%23fdfbf7'/><line x1='35' y1='36' x2='65' y2='36' stroke='%23111111' stroke-width='4' stroke-linecap='round'/><line x1='35' y1='46' x2='65' y2='46' stroke='%23111111' stroke-width='4' stroke-linecap='round'/><line x1='35' y1='56' x2='53' y2='56' stroke='%23111111' stroke-width='4' stroke-linecap='round'/></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -63,7 +64,7 @@
         .header-badges {
             display: flex;
             justify-content: center;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 10px;
             margin-top: 12px;
         }
@@ -357,10 +358,8 @@
 
     <header>
         <h1>The Daily Brief</h1>
-        <div class="meta-line" id="gen-date">Loading publication date...</div>
         <div class="header-badges">
-            <span class="city-badge">Dallas, TX</span>
-            <span class="edition-badge">Daily Edition</span>
+            <span class="edition-badge" id="edition-badge">Frisco, TX · Daily Edition</span>
         </div>
     </header>
 
@@ -392,7 +391,7 @@
                 });
                 document.title = formattedDate;
                 document.getElementById('page-title').textContent = formattedDate;
-                document.getElementById('gen-date').textContent = `Edition: ${data.generated_at || data.date || 'Unknown'}`;
+                document.getElementById('edition-badge').textContent = `Frisco, TX · Daily Edition · ${data.generated_at || data.date || 'Unknown'}`;
 
                 const quote = data.quote || {};
                 document.getElementById('quote-text').textContent = quote.text || 'Make each day your masterpiece.';
