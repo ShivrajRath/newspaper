@@ -155,38 +155,92 @@ def fetch_quote_of_day():
 
 
 def fetch_weather():
-    """Fetch current weather for Frisco, TX using Open-Meteo (free, no key required)."""
+    """Fetch current weather for Frisco, TX using Open-Meteo (free, no key required) and generate AI description."""
+    global client
+    
+    # Load weather config from config.json if available
+    config = load_config("config.json")
+    weather_config = config.get("weather", {})
+    location = weather_config.get("location", "Frisco, TX")
+    latitude = weather_config.get("latitude", 33.1507)
+    longitude = weather_config.get("longitude", -96.8236)
+    
+    # Simplified API call - only get current and daily data we need
     url = (
-        "https://api.open-meteo.com/v1/forecast"
-        "?latitude=33.1507&longitude=-96.8236"
-        "&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
-        "wind_speed_10m,weather_code,precipitation"
+        f"https://api.open-meteo.com/v1/forecast"
+        f"?latitude={latitude}&longitude={longitude}"
+        "&current=temperature_2m,weather_code"
+        "&daily=temperature_2m_max,temperature_2m_min,weather_code"
         "&temperature_unit=fahrenheit&wind_speed_unit=mph"
-        "&timezone=America%2FChicago"
+        "&timezone=America/Chicago"
     )
+    
     try:
         with safe_urlopen(url, timeout=15) as resp:
             data = json.loads(resp.read().decode())
-            curr = data.get("current", {})
-            code = curr.get("weather_code", 0)
-            desc, emoji = WMO_CODES.get(code, ("Unknown", "🌡️"))
+            
+            # Current temp
+            current_temp = round(data.get("current", {}).get("temperature_2m", 0))
+            
+            # Daily forecast max & min (index 0 is today)
+            daily = data.get("daily", {})
+            high_temp = round(daily.get("temperature_2m_max", [0])[0])
+            low_temp = round(daily.get("temperature_2m_min", [0])[0])
+            code = daily.get("weather_code", [0])[0]
+            desc, emoji = WMO_CODES.get(code, ("Variable conditions", "🌡️"))
+            
+            # Ground truth string
+            raw_summary = (
+                f"{location}: Currently {current_temp}°F, High of {high_temp}°F, Low of {low_temp}°F with {desc.lower()}."
+            )
+            
+            # Generate AI description if available
+            ai_description = None
+            if client:
+                try:
+                    prompt = (
+                        f"Turn this weather data into a short 1-sentence newspaper header snippet "
+                        f"(e.g. '🌤️ Frisco: High of 92°F, Low of 74°F with scattered clouds'): {raw_summary}"
+                    )
+                    time.sleep(1)
+                    response = client.models.generate_content(
+                        model=GEMINI_MODEL,
+                        contents=prompt
+                    )
+                    ai_description = response.text.strip()
+                    logging.info("AI weather description generated: %s", ai_description[:50])
+                except Exception as e:
+                    err_str = str(e)
+                    if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
+                        logging.warning("Gemini AI API error (%s). Disabling AI.", e)
+                        client = None
+                    else:
+                        logging.warning("AI weather description failed: %s. Using fallback.", e)
+            
+            # Fallback to formatted string if AI unavailable
+            if not ai_description:
+                ai_description = f"🌤️ {raw_summary}"
+            
             return {
-                "temperature_f": round(curr.get("temperature_2m", 0)),
-                "feels_like_f": round(curr.get("apparent_temperature", 0)),
-                "humidity": curr.get("relative_humidity_2m", 0),
-                "wind_mph": round(curr.get("wind_speed_10m", 0), 1),
-                "precipitation_mm": curr.get("precipitation", 0),
+                "location": location,
+                "temperature_f": current_temp,
+                "high_temp_f": high_temp,
+                "low_temp_f": low_temp,
                 "condition": desc,
                 "emoji": emoji,
-                "location": "Frisco, TX"
+                "description": ai_description
             }
+            
     except Exception as e:
         logging.warning("Error fetching weather: %s", e)
         return {
+            "location": location,
             "temperature_f": None,
+            "high_temp_f": None,
+            "low_temp_f": None,
             "condition": "Unavailable",
             "emoji": "🌡️",
-            "location": "Frisco, TX"
+            "description": f"🌡️ {location} weather unavailable"
         }
 
 

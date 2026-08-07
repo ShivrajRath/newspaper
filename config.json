@@ -1,4 +1,10 @@
 {
+  "weather": {
+    "enabled": true,
+    "location": "Frisco, TX",
+    "latitude": 33.1507,
+    "longitude": -96.8236
+  },
   "market": {
     "enabled": true,
     "tickers": [

@@ -383,8 +383,8 @@
                 margin-bottom: 6px;
             }
 
-            /* Strip weather/puzzle card coloured stat boxes */
-            .weather-stat {
+            /* Strip puzzle card coloured stat boxes */
+            .puzzle-stat {
                 background: transparent !important;
                 border: none !important;
             }
@@ -403,69 +403,21 @@
                 text-decoration: none;
             }
         }
+
         /* ── Weather Card ───────────────────────────────────── */
         .weather-card {
             background: linear-gradient(135deg, #e8f4fd 0%, #f0f8ff 100%);
             border: 1px solid #b8d8f0;
         }
 
-        .weather-main {
-            display: flex;
-            align-items: center;
-            gap: 18px;
-            margin-bottom: 16px;
-        }
-
-        .weather-emoji {
-            font-size: 3.2rem;
-            line-height: 1;
-            flex-shrink: 0;
-        }
-
-        .weather-temp {
+        .weather-description {
             font-family: "Newsreader", Georgia, serif;
-            font-size: 2.8rem;
-            font-weight: 700;
+            font-size: 1.2rem;
+            font-weight: 500;
             color: var(--accent-color);
-            line-height: 1;
-        }
-
-        .weather-condition {
-            font-size: 1rem;
-            color: var(--muted-text);
-            margin-top: 4px;
-            font-style: italic;
-        }
-
-        .weather-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-        }
-
-        .weather-stat {
-            background: rgba(255,255,255,0.75);
-            border: 1px solid rgba(184, 216, 240, 0.7);
-            border-radius: 10px;
-            padding: 10px 12px;
+            line-height: 1.5;
             text-align: center;
-        }
-
-        .weather-stat-label {
-            font-size: 0.7rem;
-            font-family: "JetBrains Mono", monospace;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: var(--muted-text);
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .weather-stat-value {
-            font-family: "Newsreader", Georgia, serif;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--accent-color);
+            padding: 8px 0;
         }
 
         /* ── Word of the Day Card ───────────────────────────── */
@@ -587,7 +539,6 @@
             margin-top: 12px;
             display: none;
         }
-
     </style>
 </head>
 
@@ -707,25 +658,11 @@
 
                 // Weather Card
                 const wx = data.weather || {};
-                if (wx.temperature_f !== undefined && wx.temperature_f !== null) {
-                    const feelsLike = wx.feels_like_f != null ? `<span class="weather-stat-label">Feels Like</span><span class="weather-stat-value">${wx.feels_like_f}°F</span>` : '';
-                    const humidity  = wx.humidity    != null ? `<span class="weather-stat-label">Humidity</span><span class="weather-stat-value">${wx.humidity}%</span>` : '';
-                    const wind      = wx.wind_mph    != null ? `<span class="weather-stat-label">Wind</span><span class="weather-stat-value">${wx.wind_mph} mph</span>` : '';
+                if (wx.description) {
                     extrasHTML += `
                         <div class="card weather-card">
                             <h2>📍 ${wx.location || 'Frisco, TX'} Weather</h2>
-                            <div class="weather-main">
-                                <span class="weather-emoji">${wx.emoji || '🌡️'}</span>
-                                <div>
-                                    <div class="weather-temp">${wx.temperature_f}°F</div>
-                                    <div class="weather-condition">${wx.condition || ''}</div>
-                                </div>
-                            </div>
-                            <div class="weather-stats">
-                                ${feelsLike ? `<div class="weather-stat">${feelsLike}</div>` : ''}
-                                ${humidity  ? `<div class="weather-stat">${humidity}</div>` : ''}
-                                ${wind      ? `<div class="weather-stat">${wind}</div>` : ''}
-                            </div>
+                            <div class="weather-description">${wx.description}</div>
                         </div>
                     `;
                 }
@@ -733,9 +670,9 @@
                 // Word of the Day Card
                 const wotd = data.word_of_the_day || {};
                 if (wotd.word) {
-                    const posHtml   = wotd.part_of_speech ? `<span class="wotd-pos">${wotd.part_of_speech}</span>` : '';
-                    const defHtml   = wotd.definition ? `<p class="wotd-definition">${wotd.definition}</p>` : '';
-                    const exHtml    = wotd.example    ? `<p class="wotd-example">“${wotd.example}”</p>` : '';
+                    const posHtml = wotd.part_of_speech ? `<span class="wotd-pos">${wotd.part_of_speech}</span>` : '';
+                    const defHtml = wotd.definition ? `<p class="wotd-definition">${wotd.definition}</p>` : '';
+                    const exHtml = wotd.example ? `<p class="wotd-example">“${wotd.example}”</p>` : '';
                     extrasHTML += `
                         <div class="card">
                             <h2>📖 Word of the Day</h2>
