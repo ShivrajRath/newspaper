@@ -8,9 +8,7 @@ from build_newspaper import (
     load_config,
     clean_html,
     local_deduplicate_articles,
-    ai_deduplicate_articles,
     ai_global_deduplicate_and_filter,
-    summarize_hn_stories_batched,
     build_newspaper,
     fetch_market_data,
 )
@@ -46,19 +44,10 @@ class TestNewspaperBuilder(unittest.TestCase):
             {"title": "Global Market Rallies After Earnings!", "summary": "Markets surged today.", "link": "http://b.com"},
             {"title": "New Tech Innovations Unveiled", "summary": "Tech event today.", "link": "http://c.com"}
         ]
-        deduped = local_deduplicate_articles(articles, max_items=4)
+        deduped = local_deduplicate_articles(articles, max_items=4, config={})
         self.assertEqual(len(deduped), 2)
         titles = [a["title"] for a in deduped]
         self.assertIn("New Tech Innovations Unveiled", titles)
-
-    def test_ai_deduplicate_fallback(self):
-        articles = [
-            {"title": "Local Sports Win Championship", "summary": "Team wins.", "link": "http://a.com"},
-            {"title": "Local Sports Win Championship!", "summary": "Team victorious.", "link": "http://b.com"}
-        ]
-        # Should fallback gracefully if Gemini is not configured or in test env
-        deduped = ai_deduplicate_articles(articles, "Sports", max_items=4)
-        self.assertEqual(len(deduped), 1)
 
     def test_ai_global_deduplicate_and_filter(self):
         articles = [
@@ -82,23 +71,13 @@ class TestNewspaperBuilder(unittest.TestCase):
         original_client = builder_module.client
         builder_module.client = FakeClient()
         try:
-            grouped = ai_global_deduplicate_and_filter(articles, max_per_section=2)
+            grouped = ai_global_deduplicate_and_filter(articles, max_per_section=2, config={"ai": {"prompts": {"article_filtering": ""}}})
         finally:
             builder_module.client = original_client
 
         self.assertEqual(list(grouped.keys()), ["World", "India"])
         self.assertEqual([a["title"] for a in grouped["World"]], ["World leaders meet over rising tensions"])
         self.assertEqual([a["title"] for a in grouped["India"]], ["Major earthquake devastates coastal city"])
-
-    def test_summarize_hn_stories_batched_fallback(self):
-        items = [
-            {"title": "Show HN: My New App", "snippet": "This is a great new app built with Python. It automates tasks."},
-            {"title": "Ask HN: Favorite Books?", "snippet": ""}
-        ]
-        summaries = summarize_hn_stories_batched(items)
-        self.assertEqual(len(summaries), 2)
-        self.assertTrue(summaries[0].startswith("This is a great new app"))
-        self.assertEqual(summaries[1], "Click link to read story.")
 
     def test_fetch_hacker_news_respects_min_score(self):
         class FakeResponse:

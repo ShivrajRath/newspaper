@@ -96,16 +96,16 @@ build_newspaper.py
 ```
 
 - **`ai.model`** — Gemini model to use for AI features (overrides `GEMINI_MODEL` env var if set)
-- **`ai.prompts.*`** — Custom prompts for various AI features (weather, word of day, puzzle, deduplication, HN summarization)
+- **`ai.prompts.article_filtering`** — Custom filtering instructions for AI to control which news stories are included (e.g., exclude certain topics, prioritize certain types of stories)
+- **`ai.prompts.weather`** — Custom prompt for weather description generation
+- **`ai.prompts.word_of_day`** — Custom prompt for word of the day generation
+- **`ai.prompts.daily_puzzle`** — Custom prompt for daily puzzle generation
 - **`limits.max_section_articles`** — Maximum number of articles per section after deduplication
 - **`limits.max_per_feed`** — Maximum articles to fetch from each RSS feed
 - **`limits.max_feed_age_days`** — Maximum age of articles to include from feeds
 - **`limits.deduplication_similarity_threshold`** — Similarity threshold for duplicate detection (0-1)
 - **`limits.word_overlap_threshold`** — Word overlap threshold for duplicate detection (0-1)
 - **`limits.page_snippet_length`** — Character limit for page content extraction
-- **`limits.hn_snippet_length`** — Character limit for HN story snippets
-- **`limits.hn_summary_min_words`** — Minimum word count for HN AI summaries
-- **`limits.hn_summary_max_words`** — Maximum word count for HN AI summaries
 - **`market.tickers`** — any symbol supported by `yfinance`; `type` can be `"stock"` or `"crypto"`.
 - **`hacker_news.min_score`** — only stories with at least this upvote count are included.
 - **`sections[].feeds`** — one or more RSS feed URLs per section. When multiple feeds are given, deduplication runs automatically.
