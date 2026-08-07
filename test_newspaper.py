@@ -44,7 +44,7 @@ class TestNewspaperBuilder(unittest.TestCase):
             {"title": "Global Market Rallies After Earnings!", "summary": "Markets surged today.", "link": "http://b.com"},
             {"title": "New Tech Innovations Unveiled", "summary": "Tech event today.", "link": "http://c.com"}
         ]
-        deduped = local_deduplicate_articles(articles, max_items=4, config={})
+        deduped = local_deduplicate_articles(articles, 4, {})
         self.assertEqual(len(deduped), 2)
         titles = [a["title"] for a in deduped]
         self.assertIn("New Tech Innovations Unveiled", titles)
@@ -68,12 +68,8 @@ class TestNewspaperBuilder(unittest.TestCase):
 
             models = Models()
 
-        original_client = builder_module.client
-        builder_module.client = FakeClient()
-        try:
-            grouped = ai_global_deduplicate_and_filter(articles, max_per_section=2, config={"ai": {"prompts": {"article_filtering": ""}}})
-        finally:
-            builder_module.client = original_client
+        client_ref = [FakeClient()]
+        grouped = ai_global_deduplicate_and_filter(articles, 2, {"ai": {"prompts": {"article_filtering": ""}}}, client_ref)
 
         self.assertEqual(list(grouped.keys()), ["World", "India"])
         self.assertEqual([a["title"] for a in grouped["World"]], ["World leaders meet over rising tensions"])
@@ -156,13 +152,12 @@ class TestNewspaperBuilder(unittest.TestCase):
              patch.object(builder_module, "fetch_section_articles", return_value=articles), \
              patch.object(builder_module, "fetch_quote_of_day", return_value={"text": "", "author": ""}), \
              patch.object(builder_module, "fetch_hacker_news", return_value=[]), \
-             patch.object(builder_module, "fetch_market_data", return_value={}):
-            original_client = builder_module.client
-            builder_module.client = FakeClient()
-            try:
-                builder_module.build_newspaper()
-            finally:
-                builder_module.client = original_client
+             patch.object(builder_module, "fetch_market_data", return_value={}), \
+             patch.object(builder_module, "initialize_ai_client", return_value=FakeClient()), \
+             patch.object(builder_module, "fetch_weather", return_value={}), \
+             patch.object(builder_module, "fetch_word_of_day", return_value={}), \
+             patch.object(builder_module, "fetch_daily_puzzle", return_value={}):
+            builder_module.build_newspaper()
 
         with open("newspaper.json", "r", encoding="utf-8") as f:
             data = json.load(f)

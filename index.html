@@ -241,21 +241,6 @@
             color: var(--accent-color);
         }
 
-        .summary-body {
-            font-size: 0.96rem;
-            margin-bottom: 14px;
-            color: var(--text-color);
-        }
-
-        .lead-card .summary-body::first-letter {
-            float: left;
-            font-family: "Newsreader", Georgia, serif;
-            font-size: 3rem;
-            line-height: 0.8;
-            margin: 0.12em 0.2em 0 0;
-            color: var(--accent-color);
-        }
-
         .article-links {
             font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 0.92rem;
@@ -646,13 +631,9 @@
                     }).join('');
                     if (!articlesHTML) return '';
 
-                    const bodyText = stripHtml(details.summary || '');
-                    const summaryBlock = bodyText ? `<div class="summary-body">${bodyText.replace(/\n/g, '<br>')}</div>` : '';
-
                     return `
                         <div class="card${index === 0 ? ' lead-card' : ''}">
                             <h2>${catName}</h2>
-                            ${summaryBlock}
                             <div class="article-links">${articlesHTML}</div>
                         </div>
                     `;

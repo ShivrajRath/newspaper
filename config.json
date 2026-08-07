@@ -48,12 +48,6 @@
         "label": "VOO",
         "type": "stock",
         "exchange": "NASDAQ"
-      },
-      {
-        "symbol": "Gold",
-        "label": "Gold",
-        "type": "commodity",
-        "exchange": "COMEX"
       }
     ]
   },

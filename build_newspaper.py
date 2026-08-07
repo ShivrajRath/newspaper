@@ -11,19 +11,33 @@ import difflib
 import time
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
+from constants import WMO_CODES, FALLBACK_WORDS, FALLBACK_PUZZLES
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-client = None
 
-try:
-    if GEMINI_API_KEY:
-        from google import genai
-        client = genai.Client(api_key=GEMINI_API_KEY)
-except Exception as e:
-    logging.warning("Gemini AI client initialization failed or key not set: %s", e)
-    client = None
+def initialize_ai_client():
+    """Initialize and return the Gemini AI client, or None if unavailable."""
+    try:
+        if GEMINI_API_KEY:
+            from google import genai
+            return genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as e:
+        logging.warning("Gemini AI client initialization failed or key not set: %s", e)
+    return None
+
+
+def _handle_ai_error(e, operation_name, client_ref):
+    """Handle AI API errors with consistent logging and client disabling."""
+    err_str = str(e)
+    if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
+        logging.warning("Gemini AI API error (%s). Disabling AI.", e)
+        client_ref[0] = None  # Disable client by reference
+        return True  # AI disabled
+    else:
+        logging.warning("AI %s failed: %s.", operation_name, e)
+        return False  # AI still available
 
 
 def load_config(config_path="config.json"):
@@ -63,87 +77,6 @@ def clean_html(text):
     return html.unescape(text)
 
 
-# WMO Weather Interpretation Codes → (description, emoji)
-WMO_CODES = {
-    0: ("Clear sky", "☀️"),
-    1: ("Mainly clear", "🌤️"),
-    2: ("Partly cloudy", "⛅"),
-    3: ("Overcast", "☁️"),
-    45: ("Foggy", "🌫️"),
-    48: ("Icy fog", "🌫️"),
-    51: ("Light drizzle", "🌦️"),
-    53: ("Moderate drizzle", "🌦️"),
-    55: ("Dense drizzle", "🌧️"),
-    61: ("Slight rain", "🌧️"),
-    63: ("Moderate rain", "🌧️"),
-    65: ("Heavy rain", "🌧️"),
-    71: ("Slight snow", "❄️"),
-    73: ("Moderate snow", "❄️"),
-    75: ("Heavy snow", "❄️"),
-    80: ("Slight showers", "🌦️"),
-    81: ("Moderate showers", "🌦️"),
-    82: ("Heavy showers", "⛈️"),
-    95: ("Thunderstorm", "⛈️"),
-    96: ("Thunderstorm w/ hail", "⛈️"),
-    99: ("Thunderstorm w/ heavy hail", "⛈️"),
-}
-
-# Curated word list for fallback (one per day-of-year, cycling)
-FALLBACK_WORDS = [
-    "ephemeral", "sonder", "serendipity", "melancholy", "luminous",
-    "petrichor", "ineffable", "soliloquy", "halcyon", "querulous",
-    "fugacious", "sempiternal", "laconic", "perspicacious", "ebullient",
-    "recondite", "sanguine", "tenacious", "veracious", "whimsical",
-    "zealous", "arcane", "benevolent", "cogent", "dauntless",
-    "eloquent", "fastidious", "grandiose", "heuristic", "indefatigable",
-]
-
-FALLBACK_PUZZLES = [
-    {
-        "type": "riddle",
-        "question": "I speak without a mouth and hear without ears. I have no body, but I come alive with the wind. What am I?",
-        "answer": "An echo",
-        "hint": "Think about sound bouncing back to you in a canyon."
-    },
-    {
-        "type": "riddle",
-        "question": "The more you take, the more you leave behind. What am I?",
-        "answer": "Footsteps",
-        "hint": "Think about walking on a trail."
-    },
-    {
-        "type": "riddle",
-        "question": "I have cities, but no houses live there. I have mountains, but no trees grow there. I have water, but no fish swim there. I have roads, but no cars drive there. What am I?",
-        "answer": "A map",
-        "hint": "You unfold me to find your way."
-    },
-    {
-        "type": "riddle",
-        "question": "What has hands but can't clap?",
-        "answer": "A clock",
-        "hint": "It helps you keep track of time."
-    },
-    {
-        "type": "riddle",
-        "question": "What gets wetter the more it dries?",
-        "answer": "A towel",
-        "hint": "You use it after a shower."
-    },
-    {
-        "type": "riddle",
-        "question": "I'm light as a feather, yet the strongest man can't hold me for more than a minute. What am I?",
-        "answer": "Breath",
-        "hint": "You do it automatically, all the time."
-    },
-    {
-        "type": "riddle",
-        "question": "What begins with T, ends with T, and has T in it?",
-        "answer": "A teapot",
-        "hint": "You boil water to use it."
-    },
-]
-
-
 def fetch_quote_of_day():
     """Fetch the quote of the day from ZenQuotes with a graceful fallback."""
     try:
@@ -164,14 +97,8 @@ def fetch_quote_of_day():
     }
 
 
-def fetch_weather(config=None):
-    """Fetch current weather for Frisco, TX using Open-Meteo (free, no key required) and generate AI description."""
-    global client
-    
-    # Load config if not provided
-    if config is None:
-        config = load_config("config.json")
-    
+def fetch_weather(config, client_ref):
+    """Fetch current weather for configured location using Open-Meteo (free, no key required) and generate AI description."""
     weather_config = config.get("weather", {})
     ai_config = config.get("ai", {})
     
@@ -213,23 +140,18 @@ def fetch_weather(config=None):
             
             # Generate AI description if available
             ai_description = None
-            if client:
+            if client_ref[0]:
                 try:
                     prompt = weather_prompt.format(data=raw_summary)
                     time.sleep(1)
-                    response = client.models.generate_content(
+                    response = client_ref[0].models.generate_content(
                         model=gemini_model,
                         contents=prompt
                     )
                     ai_description = response.text.strip()
                     logging.info("AI weather description generated: %s", ai_description[:50])
                 except Exception as e:
-                    err_str = str(e)
-                    if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
-                        logging.warning("Gemini AI API error (%s). Disabling AI.", e)
-                        client = None
-                    else:
-                        logging.warning("AI weather description failed: %s. Using fallback.", e)
+                    _handle_ai_error(e, "weather description", client_ref)
             
             # Fallback to formatted string if AI unavailable
             if not ai_description:
@@ -258,24 +180,18 @@ def fetch_weather(config=None):
         }
 
 
-def fetch_word_of_day(config=None):
+def fetch_word_of_day(config, client_ref):
     """Generate Word of the Day using Gemini AI, with Free Dictionary API fallback."""
-    global client
-
-    # Load config if not provided
-    if config is None:
-        config = load_config("config.json")
-    
     ai_config = config.get("ai", {})
     gemini_model = ai_config.get("model", "gemini-3.5-flash")
     word_prompt = get_config_value(ai_config, "prompts.word_of_day",
         "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.")
 
     # Try Gemini AI first
-    if client:
+    if client_ref[0]:
         try:
             time.sleep(1)
-            response = client.models.generate_content(
+            response = client_ref[0].models.generate_content(
                 model=gemini_model,
                 contents=word_prompt
             )
@@ -286,12 +202,7 @@ def fetch_word_of_day(config=None):
                     logging.info("Word of the day from AI: %s", parsed["word"])
                     return parsed
         except Exception as e:
-            err_str = str(e)
-            if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
-                logging.warning("Gemini AI API error (%s). Disabling AI.", e)
-                client = None
-            else:
-                logging.warning("AI word-of-day failed: %s. Falling back.", e)
+            _handle_ai_error(e, "word-of-day", client_ref)
 
     # Fallback: pick word from curated list by day-of-year, look up definition
     day_of_year = datetime.now().timetuple().tm_yday
@@ -319,23 +230,17 @@ def fetch_word_of_day(config=None):
     return {"word": word, "part_of_speech": "", "definition": "", "example": ""}
 
 
-def fetch_daily_puzzle(config=None):
+def fetch_daily_puzzle(config, client_ref):
     """Generate a daily puzzle (riddle or trivia) using Gemini AI, with a fallback."""
-    global client
-
-    # Load config if not provided
-    if config is None:
-        config = load_config("config.json")
-    
     ai_config = config.get("ai", {})
     gemini_model = ai_config.get("model", "gemini-3.5-flash")
     puzzle_prompt = get_config_value(ai_config, "prompts.daily_puzzle",
         "Generate a fun, clever daily puzzle for a newspaper. It should be a riddle or lateral-thinking question that is not too easy and not too hard. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.")
 
-    if client:
+    if client_ref[0]:
         try:
             time.sleep(1)
-            response = client.models.generate_content(
+            response = client_ref[0].models.generate_content(
                 model=gemini_model,
                 contents=puzzle_prompt
             )
@@ -346,20 +251,15 @@ def fetch_daily_puzzle(config=None):
                     logging.info("Daily puzzle from AI: %s", parsed["question"][:40])
                     return parsed
         except Exception as e:
-            err_str = str(e)
-            if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
-                logging.warning("Gemini AI API error (%s). Disabling AI.", e)
-                client = None
-            else:
-                logging.warning("AI puzzle generation failed: %s. Falling back.", e)
+            _handle_ai_error(e, "puzzle generation", client_ref)
 
     # Fallback: pick from curated list by day-of-year
     day_of_year = datetime.now().timetuple().tm_yday
     return FALLBACK_PUZZLES[day_of_year % len(FALLBACK_PUZZLES)]
 
 
-def safe_fetch_url(url, timeout=15):
-    """Safely fetch raw bytes from URL supporting SSL fallback."""
+def _prepare_safe_url(url):
+    """Prepare URL with proper query encoding and user agent."""
     parsed = urllib.parse.urlsplit(url)
     if parsed.query:
         # Unquote first to decode any existing encoding, then re-quote with safe characters
@@ -368,29 +268,12 @@ def safe_fetch_url(url, timeout=15):
     else:
         query = ''
     safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment))
-    request = urllib.request.Request(safe_url, headers={"User-Agent": "Mozilla/5.0"})
-
-    for ctx in (ssl.create_default_context(), ssl._create_unverified_context()):
-        try:
-            with urllib.request.urlopen(request, timeout=timeout, context=ctx) as response:
-                return response.read()
-        except Exception:
-            continue
-    return None
+    return urllib.request.Request(safe_url, headers={"User-Agent": "Mozilla/5.0"})
 
 
 def safe_urlopen(url, timeout=15):
     """Safely open URL returning response handle. Raises ConnectionError if all attempts fail."""
-    parsed = urllib.parse.urlsplit(url)
-    if parsed.query:
-        # Unquote first to decode any existing encoding, then re-quote with safe characters
-        unquoted_query = urllib.parse.unquote(parsed.query)
-        query = urllib.parse.quote(unquoted_query, safe=',=&|:+()/')
-    else:
-        query = ''
-    safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment))
-    request = urllib.request.Request(safe_url, headers={"User-Agent": "Mozilla/5.0"})
-
+    request = _prepare_safe_url(url)
     last_exc = None
     for ctx in (ssl.create_default_context(), ssl._create_unverified_context()):
         try:
@@ -401,12 +284,17 @@ def safe_urlopen(url, timeout=15):
     raise ConnectionError(f"Failed to open URL {url}: {last_exc}")
 
 
-def fetch_feed_entries(url, max_items=15, max_age_days=1, config=None):
+def safe_fetch_url(url, timeout=15):
+    """Safely fetch raw bytes from URL supporting SSL fallback."""
+    try:
+        with safe_urlopen(url, timeout=timeout) as response:
+            return response.read()
+    except ConnectionError:
+        return None
+
+
+def fetch_feed_entries(url, max_items, max_age_days, config):
     """Fetch recent feed entries from an RSS feed URL."""
-    # Load config if not provided
-    if config is None:
-        config = load_config("config.json")
-    
     limits_config = config.get("limits", {})
     
     if max_items == 15:  # Use default if not explicitly provided
@@ -443,34 +331,34 @@ def fetch_feed_entries(url, max_items=15, max_age_days=1, config=None):
         summary_raw = entry.get("summary", entry.get("description", ""))
         title = clean_html(title_raw).strip()
         summary = clean_html(summary_raw).strip()
-        articles.append({
-            "title": title or "Untitled",
-            "summary": summary,
-            "link": entry.get("link", "")
-        })
-        if len(articles) >= max_items:
-            break
+        if title:  # Only add articles with valid titles
+            articles.append({
+                "title": title,
+                "summary": summary,
+                "link": entry.get("link", "")
+            })
+            if len(articles) >= max_items:
+                break
     return articles
 
 
-def fetch_section_articles(feed_urls, max_per_feed=15, config=None):
+def fetch_section_articles(feed_urls, max_per_feed, config):
     """Fetch articles across all feed URLs specified for a section."""
+    limits_config = config.get("limits", {})
+    max_age_days = limits_config.get("max_feed_age_days", 1)
+    
     all_articles = []
     for url in feed_urls:
-        entries = fetch_feed_entries(url, max_items=max_per_feed, config=config)
+        entries = fetch_feed_entries(url, max_per_feed, max_age_days, config)
         all_articles.extend(entries)
     return all_articles
 
 
-def local_deduplicate_articles(articles, max_items=15, config=None):
+def local_deduplicate_articles(articles, max_items, config):
     """Filter duplicate or near-duplicate articles using rule-based title similarity."""
     if not articles:
         return []
 
-    # Load config if not provided
-    if config is None:
-        config = load_config("config.json")
-    
     limits_config = config.get("limits", {})
     similarity_threshold = limits_config.get("deduplication_similarity_threshold", 0.65)
     word_overlap_threshold = limits_config.get("word_overlap_threshold", 0.7)
@@ -512,12 +400,8 @@ def local_deduplicate_articles(articles, max_items=15, config=None):
     return unique_articles[:max_items]
 
 
-def fetch_all_feeds_globally(sections, max_per_feed=15, config=None):
+def fetch_all_feeds_globally(sections, max_per_feed, config):
     """Fetch all RSS articles from every section once and tag each item with its section."""
-    # Load config if not provided
-    if config is None:
-        config = load_config("config.json")
-    
     limits_config = config.get("limits", {})
     
     if max_per_feed == 15:  # Use default if not explicitly provided
@@ -537,12 +421,8 @@ def fetch_all_feeds_globally(sections, max_per_feed=15, config=None):
     return all_articles
 
 
-def _local_group_articles_by_section(all_articles, max_per_section=15, config=None):
+def _local_group_articles_by_section(all_articles, max_per_section, config):
     """Fallback grouping that preserves section membership without cross-section deduplication."""
-    # Load config if not provided
-    if config is None:
-        config = load_config("config.json")
-    
     limits_config = config.get("limits", {})
     
     if max_per_section == 15:  # Use default if not explicitly provided
@@ -563,14 +443,8 @@ def _local_group_articles_by_section(all_articles, max_per_section=15, config=No
     return grouped_articles
 
 
-def ai_global_deduplicate_and_filter(all_articles, max_per_section=15, config=None):
+def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, client_ref):
     """Use a single AI call to deduplicate across sections and filter insignificant stories."""
-    global client
-
-    # Load config if not provided
-    if config is None:
-        config = load_config("config.json")
-    
     ai_config = config.get("ai", {})
     limits_config = config.get("limits", {})
     
@@ -584,8 +458,8 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section=15, config=No
     if not all_articles:
         return {}
 
-    if not client:
-        return _local_group_articles_by_section(all_articles, max_per_section=max_per_section, config=config)
+    if not client_ref[0]:
+        return _local_group_articles_by_section(all_articles, max_per_section, config)
 
     formatted_list = []
     for idx, article in enumerate(all_articles, 1):
@@ -603,7 +477,7 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section=15, config=No
 
     try:
         time.sleep(1)
-        response = client.models.generate_content(
+        response = client_ref[0].models.generate_content(
             model=gemini_model,
             contents=prompt
         )
@@ -658,14 +532,8 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section=15, config=No
         logging.info("AI global deduplication selected stories across %d articles", len(all_articles))
         return grouped_articles
     except Exception as e:
-        err_str = str(e)
-        if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
-            logging.warning("Gemini AI API error (%s). Disabling AI for remaining tasks and using local fallback.", e)
-            client = None
-        else:
-            logging.warning("AI global deduplication failed: %s. Using local fallback.", e)
-
-    return _local_group_articles_by_section(all_articles, max_per_section=max_per_section)
+        _handle_ai_error(e, "global deduplication", client_ref)
+        return _local_group_articles_by_section(all_articles, max_per_section, config)
 
 
 def fetch_hacker_news(hn_config):
@@ -741,10 +609,6 @@ def fetch_market_data(market_config):
     for ticker_info in tickers_list:
         symbol = ticker_info.get("symbol")
         label = ticker_info.get("label", symbol)
-        ticker_type = ticker_info.get("type", "stock")
-
-        if ticker_type == "commodity":
-            continue
 
         if not symbol:
             continue
@@ -768,7 +632,7 @@ def fetch_market_data(market_config):
             encoded_symbol = urllib.parse.quote(symbol)
             google_url = f"https://www.google.com/finance/quote/{encoded_symbol}:NASDAQ"
             quote_html = safe_fetch_url(google_url, timeout=10)
-            if quote_html is None:
+            if not quote_html:
                 raise ValueError("No response from Google Finance")
 
             parsed_quote = _parse_google_finance_quote(quote_html, symbol)
@@ -789,13 +653,16 @@ def build_newspaper():
     config = load_config("config.json")
     limits_config = config.get("limits", {})
     max_section_articles = limits_config.get("max_section_articles", 8)
+    
+    # Initialize AI client as a mutable reference
+    client_ref = [initialize_ai_client()]
 
     output_content = {
         "generated_at": datetime.now().strftime("%B %d, %Y %I:%M %p"),
         "quote": fetch_quote_of_day(),
-        "weather": fetch_weather(config=config),
-        "word_of_the_day": fetch_word_of_day(config=config),
-        "puzzle": fetch_daily_puzzle(config=config),
+        "weather": fetch_weather(config, client_ref),
+        "word_of_the_day": fetch_word_of_day(config, client_ref),
+        "puzzle": fetch_daily_puzzle(config, client_ref),
         "categories": {},
         "market": {},
         "hacker_news": []
@@ -803,14 +670,13 @@ def build_newspaper():
 
     # Fetch all sections once, then deduplicate globally across sections.
     sections = config.get("sections", [])
-    all_articles = fetch_all_feeds_globally(sections, max_per_feed=15, config=config)
-    grouped_articles = ai_global_deduplicate_and_filter(all_articles, max_per_section=max_section_articles, config=config)
+    all_articles = fetch_all_feeds_globally(sections, 15, config)
+    grouped_articles = ai_global_deduplicate_and_filter(all_articles, max_section_articles, config, client_ref)
 
     for section in sections:
         sec_name = section.get("name", "General")
         filtered_articles = grouped_articles.get(sec_name, [])
         output_content["categories"][sec_name] = {
-            "summary": "",
             "articles": filtered_articles[:max_section_articles]
         }
 
