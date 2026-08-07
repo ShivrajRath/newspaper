@@ -67,6 +67,7 @@
             flex-wrap: nowrap;
             gap: 10px;
             margin-top: 12px;
+            align-items: center;
         }
 
         .city-badge,
@@ -84,22 +85,38 @@
             color: var(--accent-color);
         }
 
-        .toolbar {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 16px;
+        .print-icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
 
-        .print-btn {
-            border: 1px solid var(--border-color);
+        .print-icon-btn:hover {
             background: var(--accent-color);
-            color: white;
-            padding: 8px 14px;
-            border-radius: 999px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 600;
         }
+
+        .print-icon-btn:hover svg {
+            stroke: white;
+        }
+
+        .print-icon-btn svg {
+            width: 16px;
+            height: 16px;
+            stroke: var(--accent-color);
+            stroke-width: 2;
+            fill: none;
+            transition: stroke 0.2s ease;
+        }
+
+
 
         .quote-card {
             background: linear-gradient(135deg, #f8efe0 0%, #fffdf8 100%);
@@ -548,12 +565,16 @@
         <h1>The Daily Brief</h1>
         <div class="header-badges">
             <span class="edition-badge" id="edition-badge">Frisco, TX · Daily Edition</span>
+            <button class="print-icon-btn no-print" onclick="window.print()" aria-label="Print">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+            </button>
         </div>
     </header>
-
-    <div class="toolbar no-print">
-        <button class="print-btn" onclick="window.print()">Print this edition</button>
-    </div>
 
     <div class="quote-card" id="quote-card">
         <p class="quote-text" id="quote-text">Loading quote...</p>
