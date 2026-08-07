@@ -1,9 +1,6 @@
 name: Generate & Deploy Newspaper
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
   schedule:
     - cron: "17 8 * * *" # Runs at 2:17 AM CST (UTC-6) / 3:17 AM CDT (UTC-5) — closest year-round approximation
