@@ -59,14 +59,15 @@
       "name": "USA",
       "feeds": [
         "https://feeds.npr.org/1001/rss.xml",
-        "https://news.google.com/rss/search?q=when:24h+location:United+States&hl=en-US&gl=US&ceid=US:en"
+        "https://www.pbs.org/newshour/feeds/rss/headlines"
       ]
     },
     {
       "name": "India & Asia",
       "feeds": [
         "http://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
-        "https://rss.dw.com/rdf/rss-en-asia"
+        "https://rss.dw.com/rdf/rss-en-asia",
+        "https://news.google.com/rss/search?q=Odisha&hl=en-IN&gl=IN&ceid=IN:en"
       ]
     },
     {
