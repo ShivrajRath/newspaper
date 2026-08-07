@@ -1,6 +1,23 @@
 {
   "ai": {
-    "model": "gemini-3.5-flash",
+    "models": {
+      "article_filtering": {
+        "primary": "gemini-3.6-flash",
+        "secondary": "gemini-3.5-flash"
+      },
+      "weather": {
+        "primary": "gemini-3.5-flash-lite",
+        "secondary": "gemini-3.1-flash-lite"
+      },
+      "word_of_day": {
+        "primary": "gemini-3.5-flash-lite",
+        "secondary": "gemini-3.1-flash-lite"
+      },
+      "daily_puzzle": {
+        "primary": "gemini-3.5-flash-lite",
+        "secondary": "gemini-3.1-flash-lite"
+      }
+    },
     "prompts": {
       "weather": "Turn this weather data into a short 1-sentence newspaper header snippet (e.g. '🌤️ Frisco: High of 92°F, Low of 74°F with scattered clouds'): {data}",
       "word_of_day": "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.",

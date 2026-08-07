@@ -17,6 +17,61 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
+
+class RateLimitTracker:
+    """Track rate limits from actual API responses."""
+    
+    def __init__(self):
+        self.model_limits = {}  # model -> {rpm_used, tpm_used, rpd_used, rpm_limit, tpm_limit, rpd_limit}
+    
+    def update_from_response(self, model, response):
+        """Extract and store rate limit info from API response."""
+        try:
+            # Check for usage_metadata in response
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                usage = response.usage_metadata
+                if model not in self.model_limits:
+                    self.model_limits[model] = {
+                        'rpm_used': 0, 'tpm_used': 0, 'rpd_used': 0,
+                        'rpm_limit': None, 'tpm_limit': None, 'rpd_limit': None
+                    }
+                
+                # Update token usage
+                if hasattr(usage, 'total_token_count'):
+                    self.model_limits[model]['tpm_used'] += usage.total_token_count
+                if hasattr(usage, 'prompt_token_count'):
+                    self.model_limits[model]['tpm_used'] += usage.prompt_token_count
+                if hasattr(usage, 'candidates_token_count'):
+                    self.model_limits[model]['tpm_used'] += usage.candidates_token_count
+                
+                # Increment request count
+                self.model_limits[model]['rpm_used'] += 1
+                self.model_limits[model]['rpd_used'] += 1
+                
+                logging.info("Rate limit update for %s: RPM=%d, TPM=%d, RPD=%d", 
+                           model, self.model_limits[model]['rpm_used'], 
+                           self.model_limits[model]['tpm_used'],
+                           self.model_limits[model]['rpd_used'])
+        except Exception as e:
+            logging.debug("Could not extract rate limit info: %s", e)
+    
+    def get_usage(self, model):
+        """Get current usage for a model."""
+        return self.model_limits.get(model, {})
+    
+    def is_near_limit(self, model, threshold=0.8):
+        """Check if model is near its rate limit."""
+        limits = self.model_limits.get(model, {})
+        if not limits or limits.get('rpm_limit') is None:
+            return False
+        rpm_usage = limits.get('rpm_used', 0) / max(limits.get('rpm_limit', 1), 1)
+        return rpm_usage >= threshold
+
+
+# Global rate limit tracker
+rate_limit_tracker = RateLimitTracker()
+
+
 def initialize_ai_client():
     """Initialize and return the Gemini AI client, or None if unavailable."""
     try:
@@ -38,6 +93,18 @@ def _handle_ai_error(e, operation_name, client_ref):
     else:
         logging.warning("AI %s failed: %s.", operation_name, e)
         return False  # AI still available
+
+
+def get_model_for_task(config, task_name, prefer_primary=True):
+    """Get the appropriate model for a task (primary or secondary)."""
+    ai_config = config.get("ai", {})
+    models_config = ai_config.get("models", {})
+    
+    task_config = models_config.get(task_name, {})
+    if prefer_primary:
+        return task_config.get("primary", ai_config.get("model", "gemini-3.5-flash"))
+    else:
+        return task_config.get("secondary", ai_config.get("model", "gemini-3.5-flash"))
 
 
 def load_config(config_path="config.json"):
@@ -141,17 +208,26 @@ def fetch_weather(config, client_ref):
             # Generate AI description if available
             ai_description = None
             if client_ref[0]:
-                try:
-                    prompt = weather_prompt.format(data=raw_summary)
-                    time.sleep(1)
-                    response = client_ref[0].models.generate_content(
-                        model=gemini_model,
-                        contents=prompt
-                    )
-                    ai_description = response.text.strip()
-                    logging.info("AI weather description generated: %s", ai_description[:50])
-                except Exception as e:
-                    _handle_ai_error(e, "weather description", client_ref)
+                # Try primary model first, then secondary
+                for model_name in [get_model_for_task(config, "weather", prefer_primary=True), 
+                                   get_model_for_task(config, "weather", prefer_primary=False)]:
+                    try:
+                        prompt = weather_prompt.format(data=raw_summary)
+                        time.sleep(1)
+                        response = client_ref[0].models.generate_content(
+                            model=model_name,
+                            contents=prompt
+                        )
+                        # Track rate limits from response
+                        rate_limit_tracker.update_from_response(model_name, response)
+                        ai_description = response.text.strip()
+                        logging.info("AI weather description generated using %s: %s", model_name, ai_description[:50])
+                        break
+                    except Exception as e:
+                        if _handle_ai_error(e, f"weather description ({model_name})", client_ref):
+                            break  # AI disabled, don't try secondary
+                        logging.warning("Primary model %s failed, trying secondary...", model_name)
+                        continue
             
             # Fallback to formatted string if AI unavailable
             if not ai_description:
@@ -183,26 +259,32 @@ def fetch_weather(config, client_ref):
 def fetch_word_of_day(config, client_ref):
     """Generate Word of the Day using Gemini AI, with Free Dictionary API fallback."""
     ai_config = config.get("ai", {})
-    gemini_model = ai_config.get("model", "gemini-3.5-flash")
     word_prompt = get_config_value(ai_config, "prompts.word_of_day",
         "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.")
 
-    # Try Gemini AI first
+    # Try Gemini AI first with primary then secondary model
     if client_ref[0]:
-        try:
-            time.sleep(1)
-            response = client_ref[0].models.generate_content(
-                model=gemini_model,
-                contents=word_prompt
-            )
-            match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
-            if match:
-                parsed = json.loads(match.group(0))
-                if all(k in parsed for k in ("word", "part_of_speech", "definition", "example")):
-                    logging.info("Word of the day from AI: %s", parsed["word"])
-                    return parsed
-        except Exception as e:
-            _handle_ai_error(e, "word-of-day", client_ref)
+        for model_name in [get_model_for_task(config, "word_of_day", prefer_primary=True), 
+                           get_model_for_task(config, "word_of_day", prefer_primary=False)]:
+            try:
+                time.sleep(1)
+                response = client_ref[0].models.generate_content(
+                    model=model_name,
+                    contents=word_prompt
+                )
+                # Track rate limits from response
+                rate_limit_tracker.update_from_response(model_name, response)
+                match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group(0))
+                    if all(k in parsed for k in ("word", "part_of_speech", "definition", "example")):
+                        logging.info("Word of the day from AI using %s: %s", model_name, parsed["word"])
+                        return parsed
+            except Exception as e:
+                if _handle_ai_error(e, f"word-of-day ({model_name})", client_ref):
+                    break  # AI disabled, don't try secondary
+                logging.warning("Primary model %s failed, trying secondary...", model_name)
+                continue
 
     # Fallback: pick word from curated list by day-of-year, look up definition
     day_of_year = datetime.now().timetuple().tm_yday
@@ -233,25 +315,31 @@ def fetch_word_of_day(config, client_ref):
 def fetch_daily_puzzle(config, client_ref):
     """Generate a daily puzzle (riddle or trivia) using Gemini AI, with a fallback."""
     ai_config = config.get("ai", {})
-    gemini_model = ai_config.get("model", "gemini-3.5-flash")
     puzzle_prompt = get_config_value(ai_config, "prompts.daily_puzzle",
         "Generate a fun, clever daily puzzle for a newspaper. It should be a riddle or lateral-thinking question that is not too easy and not too hard. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.")
 
     if client_ref[0]:
-        try:
-            time.sleep(1)
-            response = client_ref[0].models.generate_content(
-                model=gemini_model,
-                contents=puzzle_prompt
-            )
-            match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
-            if match:
-                parsed = json.loads(match.group(0))
-                if all(k in parsed for k in ("type", "question", "answer", "hint")):
-                    logging.info("Daily puzzle from AI: %s", parsed["question"][:40])
-                    return parsed
-        except Exception as e:
-            _handle_ai_error(e, "puzzle generation", client_ref)
+        for model_name in [get_model_for_task(config, "daily_puzzle", prefer_primary=True), 
+                           get_model_for_task(config, "daily_puzzle", prefer_primary=False)]:
+            try:
+                time.sleep(1)
+                response = client_ref[0].models.generate_content(
+                    model=model_name,
+                    contents=puzzle_prompt
+                )
+                # Track rate limits from response
+                rate_limit_tracker.update_from_response(model_name, response)
+                match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group(0))
+                    if all(k in parsed for k in ("type", "question", "answer", "hint")):
+                        logging.info("Daily puzzle from AI using %s: %s", model_name, parsed["question"][:40])
+                        return parsed
+            except Exception as e:
+                if _handle_ai_error(e, f"puzzle generation ({model_name})", client_ref):
+                    break  # AI disabled, don't try secondary
+                logging.warning("Primary model %s failed, trying secondary...", model_name)
+                continue
 
     # Fallback: pick from curated list by day-of-year
     day_of_year = datetime.now().timetuple().tm_yday
@@ -448,7 +536,6 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
     ai_config = config.get("ai", {})
     limits_config = config.get("limits", {})
     
-    gemini_model = ai_config.get("model", "gemini-3.5-flash")
     filtering_prompt = get_config_value(ai_config, "prompts.article_filtering",
         "Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments.")
     
@@ -475,65 +562,75 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
     )
     prompt = dedup_instruction + filtering_prompt + " Return ONLY valid JSON with this shape: {\"Section Name\": [1, 3, 5]}." + f"\n\nTitles:\n" + "\n".join(formatted_list)
 
-    try:
-        time.sleep(1)
-        response = client_ref[0].models.generate_content(
-            model=gemini_model,
-            contents=prompt
-        )
-        response_text = response.text.strip()
-        match = re.search(r'(\{.*\}|\[\s*[\d\s,]+\s*\])', response_text, flags=re.DOTALL)
-        if not match:
-            raise ValueError("No JSON payload found in AI response")
+    # Try primary model first, then secondary
+    for model_name in [get_model_for_task(config, "article_filtering", prefer_primary=True), 
+                       get_model_for_task(config, "article_filtering", prefer_primary=False)]:
+        try:
+            time.sleep(1)
+            response = client_ref[0].models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            # Track rate limits from response
+            rate_limit_tracker.update_from_response(model_name, response)
+            response_text = response.text.strip()
+            match = re.search(r'(\{.*\}|\[\s*[\d\s,]+\s*\])', response_text, flags=re.DOTALL)
+            if not match:
+                raise ValueError("No JSON payload found in AI response")
 
-        parsed = json.loads(match.group(0))
-        grouped_articles = {}
+            parsed = json.loads(match.group(0))
+            grouped_articles = {}
 
-        if isinstance(parsed, dict):
-            for section_name, selected_indices in parsed.items():
-                if not isinstance(section_name, str):
-                    continue
+            if isinstance(parsed, dict):
+                for section_name, selected_indices in parsed.items():
+                    if not isinstance(section_name, str):
+                        continue
+                    selected_articles = []
+                    seen_indices = set()
+                    for index in selected_indices:
+                        if isinstance(index, int) and 1 <= index <= len(all_articles) and index not in seen_indices:
+                            article = all_articles[index - 1]
+                            if article.get("section", "General") == section_name:
+                                selected_articles.append(article)
+                                seen_indices.add(index)
+                    grouped_articles[section_name] = selected_articles[:max_per_section]
+            elif isinstance(parsed, list):
                 selected_articles = []
                 seen_indices = set()
-                for index in selected_indices:
+                for index in parsed:
                     if isinstance(index, int) and 1 <= index <= len(all_articles) and index not in seen_indices:
-                        article = all_articles[index - 1]
-                        if article.get("section", "General") == section_name:
-                            selected_articles.append(article)
-                            seen_indices.add(index)
-                grouped_articles[section_name] = selected_articles[:max_per_section]
-        elif isinstance(parsed, list):
-            selected_articles = []
-            seen_indices = set()
-            for index in parsed:
-                if isinstance(index, int) and 1 <= index <= len(all_articles) and index not in seen_indices:
-                    selected_articles.append(all_articles[index - 1])
-                    seen_indices.add(index)
-            if len({article.get("section", "General") for article in selected_articles}) <= 1:
-                section_name = all_articles[0].get("section", "General") if all_articles else "General"
-                grouped_articles[section_name] = selected_articles[:max_per_section]
+                        selected_articles.append(all_articles[index - 1])
+                        seen_indices.add(index)
+                if len({article.get("section", "General") for article in selected_articles}) <= 1:
+                    section_name = all_articles[0].get("section", "General") if all_articles else "General"
+                    grouped_articles[section_name] = selected_articles[:max_per_section]
+                else:
+                    raise ValueError("AI response array did not map to a single section")
             else:
-                raise ValueError("AI response array did not map to a single section")
-        else:
-            raise ValueError("AI response was not a JSON object or array")
+                raise ValueError("AI response was not a JSON object or array")
 
-        if not grouped_articles:
-            raise ValueError("AI response did not contain any sections")
+            if not grouped_articles:
+                raise ValueError("AI response did not contain any sections")
 
-        section_names = []
-        for article in all_articles:
-            sec_name = article.get("section", "General")
-            if sec_name not in section_names:
-                section_names.append(sec_name)
+            section_names = []
+            for article in all_articles:
+                sec_name = article.get("section", "General")
+                if sec_name not in section_names:
+                    section_names.append(sec_name)
 
-        for sec_name in section_names:
-            grouped_articles.setdefault(sec_name, [])
+            for sec_name in section_names:
+                grouped_articles.setdefault(sec_name, [])
 
-        logging.info("AI global deduplication selected stories across %d articles", len(all_articles))
-        return grouped_articles
-    except Exception as e:
-        _handle_ai_error(e, "global deduplication", client_ref)
-        return _local_group_articles_by_section(all_articles, max_per_section, config)
+            logging.info("AI global deduplication selected stories across %d articles using %s", len(all_articles), model_name)
+            return grouped_articles
+        except Exception as e:
+            if _handle_ai_error(e, f"global deduplication ({model_name})", client_ref):
+                break  # AI disabled, don't try secondary
+            logging.warning("Primary model %s failed, trying secondary...", model_name)
+            continue
+    
+    # If both models failed, fall back to local deduplication
+    return _local_group_articles_by_section(all_articles, max_per_section, config)
 
 
 def fetch_hacker_news(hn_config):
@@ -691,6 +788,24 @@ def build_newspaper():
         json.dump(output_content, f, indent=2, ensure_ascii=False)
 
     logging.info("Successfully generated newspaper.json with %d sections.", len(output_content["categories"]))
+    
+    # Log rate limit usage from actual API responses
+    if rate_limit_tracker.model_limits:
+        logging.info("=== Rate Limit Usage (from API responses) ===")
+        for model, usage in rate_limit_tracker.model_limits.items():
+            logging.info("Model: %s", model)
+            logging.info("  Requests (RPM): %d", usage.get('rpm_used', 0))
+            logging.info("  Tokens (TPM): %d", usage.get('tpm_used', 0))
+            logging.info("  Requests today (RPD): %d", usage.get('rpd_used', 0))
+            if usage.get('rpm_limit'):
+                logging.info("  RPM Limit: %d (%.1f%% used)", usage['rpm_limit'], 
+                           usage.get('rpm_used', 0) / max(usage['rpm_limit'], 1) * 100)
+            if usage.get('tpm_limit'):
+                logging.info("  TPM Limit: %d (%.1f%% used)", usage['tpm_limit'], 
+                           usage.get('tpm_used', 0) / max(usage['tpm_limit'], 1) * 100)
+            if usage.get('rpd_limit'):
+                logging.info("  RPD Limit: %d (%.1f%% used)", usage['rpd_limit'], 
+                           usage.get('rpd_used', 0) / max(usage['rpd_limit'], 1) * 100)
 
 
 if __name__ == "__main__":

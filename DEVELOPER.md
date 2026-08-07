@@ -126,14 +126,37 @@ Enables smarter cross-feed deduplication and Hacker News batch summarisation.
 
 ```bash
 export GEMINI_API_KEY="your_api_key_here"
-export GEMINI_MODEL="gemini-2.5-flash"   # optional: can also be set in config.json
 ```
 
-The AI model can also be configured in `config.json` under `ai.model`. If both are set, the config file takes precedence.
+The AI models are configured per-task in `config.json` under `ai.models`. Each task has a primary and secondary model for automatic fallback when rate limited:
+
+```json
+"ai": {
+  "models": {
+    "article_filtering": {
+      "primary": "gemini-3.6-flash",
+      "secondary": "gemini-3.5-flash"
+    },
+    "weather": {
+      "primary": "gemini-3.5-flash-lite",
+      "secondary": "gemini-3.1-flash-lite"
+    },
+    "word_of_day": {
+      "primary": "gemini-3.5-flash-lite",
+      "secondary": "gemini-3.1-flash-lite"
+    },
+    "daily_puzzle": {
+      "primary": "gemini-3.5-flash-lite",
+      "secondary": "gemini-3.1-flash-lite"
+    }
+  },
+  "prompts": { ... }
+}
+```
+
+**Rate-limit tracking**: The pipeline now tracks actual rate limit usage from API responses (via `usage_metadata`) and logs it at the end of each run.
 
 Without a key the pipeline falls back to local fuzzy-matching deduplication and sentence-extraction summaries — no functionality is lost, just quality.
-
-**Rate-limit compliance**: the pipeline caps Gemini calls at ≤ 15/min (1 call per section dedup + 1 call for HN summaries) to stay within the free tier.
 
 ---
 
