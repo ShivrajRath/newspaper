@@ -9,6 +9,7 @@ from build_newspaper import (
     clean_html,
     local_deduplicate_articles,
     ai_deduplicate_articles,
+    ai_global_deduplicate_and_filter,
     summarize_hn_stories_batched,
     build_newspaper,
     fetch_market_data,
@@ -58,6 +59,36 @@ class TestNewspaperBuilder(unittest.TestCase):
         # Should fallback gracefully if Gemini is not configured or in test env
         deduped = ai_deduplicate_articles(articles, "Sports", max_items=4)
         self.assertEqual(len(deduped), 1)
+
+    def test_ai_global_deduplicate_and_filter(self):
+        articles = [
+            {"title": "World leaders meet over rising tensions", "summary": "Major escalation.", "link": "http://a.com", "section": "World"},
+            {"title": "World leaders meet over rising tensions", "summary": "Same story.", "link": "http://b.com", "section": "India"},
+            {"title": "Local man killed in dispute", "summary": "Minor crime.", "link": "http://c.com", "section": "World"},
+            {"title": "Major earthquake devastates coastal city", "summary": "Natural disaster.", "link": "http://d.com", "section": "India"},
+        ]
+
+        class FakeResponse:
+            text = '{"World": [1, 4], "India": [4]}'
+
+        class FakeClient:
+            class Models:
+                @staticmethod
+                def generate_content(*args, **kwargs):
+                    return FakeResponse()
+
+            models = Models()
+
+        original_client = builder_module.client
+        builder_module.client = FakeClient()
+        try:
+            grouped = ai_global_deduplicate_and_filter(articles, max_per_section=2)
+        finally:
+            builder_module.client = original_client
+
+        self.assertEqual(list(grouped.keys()), ["World", "India"])
+        self.assertEqual([a["title"] for a in grouped["World"]], ["World leaders meet over rising tensions"])
+        self.assertEqual([a["title"] for a in grouped["India"]], ["Major earthquake devastates coastal city"])
 
     def test_summarize_hn_stories_batched_fallback(self):
         items = [

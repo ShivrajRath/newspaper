@@ -288,7 +288,12 @@ def fetch_daily_puzzle():
 def safe_fetch_url(url, timeout=15):
     """Safely fetch raw bytes from URL supporting SSL fallback."""
     parsed = urllib.parse.urlsplit(url)
-    query = urllib.parse.quote(parsed.query, safe='=&|:+()') if parsed.query else ''
+    if parsed.query:
+        # Unquote first to decode any existing encoding, then re-quote with safe characters
+        unquoted_query = urllib.parse.unquote(parsed.query)
+        query = urllib.parse.quote(unquoted_query, safe=',=&|:+()/')
+    else:
+        query = ''
     safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment))
     request = urllib.request.Request(safe_url, headers={"User-Agent": "Mozilla/5.0"})
 
@@ -304,7 +309,12 @@ def safe_fetch_url(url, timeout=15):
 def safe_urlopen(url, timeout=15):
     """Safely open URL returning response handle. Raises ConnectionError if all attempts fail."""
     parsed = urllib.parse.urlsplit(url)
-    query = urllib.parse.quote(parsed.query, safe='=&|:+()') if parsed.query else ''
+    if parsed.query:
+        # Unquote first to decode any existing encoding, then re-quote with safe characters
+        unquoted_query = urllib.parse.unquote(parsed.query)
+        query = urllib.parse.quote(unquoted_query, safe=',=&|:+()/')
+    else:
+        query = ''
     safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment))
     request = urllib.request.Request(safe_url, headers={"User-Agent": "Mozilla/5.0"})
 
@@ -408,6 +418,131 @@ def local_deduplicate_articles(articles, max_items=15):
             break
 
     return unique_articles[:max_items]
+
+
+def fetch_all_feeds_globally(sections, max_per_feed=15):
+    """Fetch all RSS articles from every section once and tag each item with its section."""
+    all_articles = []
+    for section in sections:
+        sec_name = section.get("name", "General")
+        feed_urls = section.get("feeds", [])
+        if not feed_urls:
+            continue
+        raw_articles = fetch_section_articles(feed_urls, max_per_feed=max_per_feed)
+        for article in raw_articles:
+            tagged_article = dict(article)
+            tagged_article["section"] = sec_name
+            all_articles.append(tagged_article)
+    return all_articles
+
+
+def _local_group_articles_by_section(all_articles, max_per_section=15):
+    """Fallback grouping that preserves section membership without cross-section deduplication."""
+    grouped_articles = {}
+    section_order = []
+    for article in all_articles:
+        sec_name = article.get("section", "General")
+        if sec_name not in grouped_articles:
+            grouped_articles[sec_name] = []
+            section_order.append(sec_name)
+        grouped_articles[sec_name].append(article)
+
+    for sec_name in section_order:
+        grouped_articles[sec_name] = local_deduplicate_articles(grouped_articles[sec_name], max_items=max_per_section)
+
+    return grouped_articles
+
+
+def ai_global_deduplicate_and_filter(all_articles, max_per_section=15):
+    """Use a single AI call to deduplicate across sections and filter insignificant stories."""
+    global client
+
+    if not all_articles:
+        return {}
+
+    if not client:
+        return _local_group_articles_by_section(all_articles, max_per_section=max_per_section)
+
+    formatted_list = []
+    for idx, article in enumerate(all_articles, 1):
+        sec_name = article.get("section", "General")
+        title = article.get("title", "Untitled").strip()
+        formatted_list.append(f"[{idx}] {title} ({sec_name})")
+
+    prompt = (
+        "You are selecting the most important and relevant news stories for a daily newspaper. "
+        "Review all article titles below, then return a JSON object mapping each section name to a list of article indices to keep. "
+        "Remove duplicates and near-duplicates across sections. Filter out insignificant stories such as gore, minor crime, single-casualty incidents, celebrity gossip, routine crime blotter items, and other clickbait. "
+        "Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments. "
+        "Return ONLY valid JSON with this shape: {\"Section Name\": [1, 3, 5]}."
+        f"\n\nTitles:\n" + "\n".join(formatted_list)
+    )
+
+    try:
+        time.sleep(1)
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt
+        )
+        response_text = response.text.strip()
+        match = re.search(r'(\{.*\}|\[\s*[\d\s,]+\s*\])', response_text, flags=re.DOTALL)
+        if not match:
+            raise ValueError("No JSON payload found in AI response")
+
+        parsed = json.loads(match.group(0))
+        grouped_articles = {}
+
+        if isinstance(parsed, dict):
+            for section_name, selected_indices in parsed.items():
+                if not isinstance(section_name, str):
+                    continue
+                selected_articles = []
+                seen_indices = set()
+                for index in selected_indices:
+                    if isinstance(index, int) and 1 <= index <= len(all_articles) and index not in seen_indices:
+                        article = all_articles[index - 1]
+                        if article.get("section", "General") == section_name:
+                            selected_articles.append(article)
+                            seen_indices.add(index)
+                grouped_articles[section_name] = selected_articles[:max_per_section]
+        elif isinstance(parsed, list):
+            selected_articles = []
+            seen_indices = set()
+            for index in parsed:
+                if isinstance(index, int) and 1 <= index <= len(all_articles) and index not in seen_indices:
+                    selected_articles.append(all_articles[index - 1])
+                    seen_indices.add(index)
+            if len({article.get("section", "General") for article in selected_articles}) <= 1:
+                section_name = all_articles[0].get("section", "General") if all_articles else "General"
+                grouped_articles[section_name] = selected_articles[:max_per_section]
+            else:
+                raise ValueError("AI response array did not map to a single section")
+        else:
+            raise ValueError("AI response was not a JSON object or array")
+
+        if not grouped_articles:
+            raise ValueError("AI response did not contain any sections")
+
+        section_names = []
+        for article in all_articles:
+            sec_name = article.get("section", "General")
+            if sec_name not in section_names:
+                section_names.append(sec_name)
+
+        for sec_name in section_names:
+            grouped_articles.setdefault(sec_name, [])
+
+        logging.info("AI global deduplication selected stories across %d articles", len(all_articles))
+        return grouped_articles
+    except Exception as e:
+        err_str = str(e)
+        if "404" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
+            logging.warning("Gemini AI API error (%s). Disabling AI for remaining tasks and using local fallback.", e)
+            client = None
+        else:
+            logging.warning("AI global deduplication failed: %s. Using local fallback.", e)
+
+    return _local_group_articles_by_section(all_articles, max_per_section=max_per_section)
 
 
 def ai_deduplicate_articles(articles, category_name, max_items=15):
@@ -672,27 +807,14 @@ def build_newspaper():
         "hacker_news": []
     }
 
-    # Fetch Sections (RSS feeds)
+    # Fetch all sections once, then deduplicate globally across sections.
     sections = config.get("sections", [])
+    all_articles = fetch_all_feeds_globally(sections, max_per_feed=15)
+    grouped_articles = ai_global_deduplicate_and_filter(all_articles, max_per_section=MAX_SECTION_ARTICLES)
+
     for section in sections:
         sec_name = section.get("name", "General")
-        feed_urls = section.get("feeds", [])
-
-        if not feed_urls:
-            output_content["categories"][sec_name] = {
-                "summary": "",
-                "articles": []
-            }
-            continue
-
-        raw_articles = fetch_section_articles(feed_urls, max_per_feed=15)
-
-        # Prefer AI selection when available; fall back to local deduplication otherwise.
-        if client:
-            filtered_articles = ai_deduplicate_articles(raw_articles, sec_name, max_items=MAX_SECTION_ARTICLES)
-        else:
-            filtered_articles = local_deduplicate_articles(raw_articles, max_items=MAX_SECTION_ARTICLES)
-
+        filtered_articles = grouped_articles.get(sec_name, [])
         output_content["categories"][sec_name] = {
             "summary": "",
             "articles": filtered_articles[:MAX_SECTION_ARTICLES]

@@ -83,13 +83,6 @@
       ]
     },
     {
-      "name": "Sports",
-      "feeds": [
-        "http://feeds.bbci.co.uk/sport/rss.xml",
-        "https://www.espn.com/espn/rss/news"
-      ]
-    },
-    {
       "name": "Local & Regional",
       "feeds": [
         "https://www.wfaa.com/feeds/syndication/rss/news/local",
