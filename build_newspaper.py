@@ -15,8 +15,6 @@ from datetime import datetime, timedelta, timezone
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
-MAX_SECTION_ARTICLES = 8
 client = None
 
 try:
@@ -41,6 +39,18 @@ def load_config(config_path="config.json"):
     else:
         logging.info("Configuration file %s not found. Using empty config.", config_path)
     return {}
+
+
+def get_config_value(config, key_path, default):
+    """Get a nested config value using dot notation (e.g., 'ai.model')."""
+    keys = key_path.split('.')
+    value = config
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return default
+    return value
 
 
 def clean_html(text):
@@ -158,12 +168,17 @@ def fetch_weather():
     """Fetch current weather for Frisco, TX using Open-Meteo (free, no key required) and generate AI description."""
     global client
     
-    # Load weather config from config.json if available
+    # Load config
     config = load_config("config.json")
     weather_config = config.get("weather", {})
+    ai_config = config.get("ai", {})
+    
     location = weather_config.get("location", "Frisco, TX")
     latitude = weather_config.get("latitude", 33.1507)
     longitude = weather_config.get("longitude", -96.8236)
+    gemini_model = ai_config.get("model", "gemini-3.5-flash")
+    weather_prompt = get_config_value(ai_config, "prompts.weather", 
+        "Turn this weather data into a short 1-sentence newspaper header snippet (e.g. '🌤️ Frisco: High of 92°F, Low of 74°F with scattered clouds'): {data}")
     
     # Simplified API call - only get current and daily data we need
     url = (
@@ -198,13 +213,10 @@ def fetch_weather():
             ai_description = None
             if client:
                 try:
-                    prompt = (
-                        f"Turn this weather data into a short 1-sentence newspaper header snippet "
-                        f"(e.g. '🌤️ Frisco: High of 92°F, Low of 74°F with scattered clouds'): {raw_summary}"
-                    )
+                    prompt = weather_prompt.format(data=raw_summary)
                     time.sleep(1)
                     response = client.models.generate_content(
-                        model=GEMINI_MODEL,
+                        model=gemini_model,
                         contents=prompt
                     )
                     ai_description = response.text.strip()
@@ -248,19 +260,20 @@ def fetch_word_of_day():
     """Generate Word of the Day using Gemini AI, with Free Dictionary API fallback."""
     global client
 
+    # Load config
+    config = load_config("config.json")
+    ai_config = config.get("ai", {})
+    gemini_model = ai_config.get("model", "gemini-3.5-flash")
+    word_prompt = get_config_value(ai_config, "prompts.word_of_day",
+        "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.")
+
     # Try Gemini AI first
     if client:
-        prompt = (
-            "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. "
-            "Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: "
-            '{"word": "...", "part_of_speech": "...", "definition": "...", "example": "..."}'
-            " where example is a short illustrative sentence using the word."
-        )
         try:
             time.sleep(1)
             response = client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=prompt
+                model=gemini_model,
+                contents=word_prompt
             )
             match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
             if match:
@@ -306,19 +319,19 @@ def fetch_daily_puzzle():
     """Generate a daily puzzle (riddle or trivia) using Gemini AI, with a fallback."""
     global client
 
+    # Load config
+    config = load_config("config.json")
+    ai_config = config.get("ai", {})
+    gemini_model = ai_config.get("model", "gemini-3.5-flash")
+    puzzle_prompt = get_config_value(ai_config, "prompts.daily_puzzle",
+        "Generate a fun, clever daily puzzle for a newspaper. It should be a riddle or lateral-thinking question that is not too easy and not too hard. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.")
+
     if client:
-        prompt = (
-            "Generate a fun, clever daily puzzle for a newspaper. "
-            "It should be a riddle or lateral-thinking question that is not too easy and not too hard. "
-            "Return ONLY a JSON object with exactly these fields: "
-            '{"type": "riddle", "question": "...", "answer": "...", "hint": "..."}'
-            " Keep the question under 30 words, and the answer under 6 words."
-        )
         try:
             time.sleep(1)
             response = client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=prompt
+                model=gemini_model,
+                contents=puzzle_prompt
             )
             match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
             if match:
@@ -384,6 +397,15 @@ def safe_urlopen(url, timeout=15):
 
 def fetch_feed_entries(url, max_items=15, max_age_days=1):
     """Fetch recent feed entries from an RSS feed URL."""
+    # Load config for default values
+    config = load_config("config.json")
+    limits_config = config.get("limits", {})
+    
+    if max_items == 15:  # Use default if not explicitly provided
+        max_items = limits_config.get("max_per_feed", 15)
+    if max_age_days == 1:  # Use default if not explicitly provided
+        max_age_days = limits_config.get("max_feed_age_days", 1)
+    
     raw_data = safe_fetch_url(url)
     if raw_data is None:
         logging.warning("Unable to fetch feed URL: %s", url)
@@ -437,6 +459,12 @@ def local_deduplicate_articles(articles, max_items=15):
     if not articles:
         return []
 
+    # Load config for thresholds
+    config = load_config("config.json")
+    limits_config = config.get("limits", {})
+    similarity_threshold = limits_config.get("deduplication_similarity_threshold", 0.65)
+    word_overlap_threshold = limits_config.get("word_overlap_threshold", 0.7)
+
     unique_articles = []
     seen_titles = []
 
@@ -451,7 +479,7 @@ def local_deduplicate_articles(articles, max_items=15):
         for seen in seen_titles:
             # Check exact or near-exact string similarity
             ratio = difflib.SequenceMatcher(None, normalized_title, seen).ratio()
-            if ratio > 0.65:
+            if ratio > similarity_threshold:
                 is_duplicate = True
                 break
             # Check word overlap
@@ -460,7 +488,7 @@ def local_deduplicate_articles(articles, max_items=15):
             if words1 and words2:
                 intersection = words1.intersection(words2)
                 overlap = len(intersection) / max(len(words1), len(words2))
-                if overlap > 0.7:
+                if overlap > word_overlap_threshold:
                     is_duplicate = True
                     break
 
@@ -476,6 +504,13 @@ def local_deduplicate_articles(articles, max_items=15):
 
 def fetch_all_feeds_globally(sections, max_per_feed=15):
     """Fetch all RSS articles from every section once and tag each item with its section."""
+    # Load config for default values
+    config = load_config("config.json")
+    limits_config = config.get("limits", {})
+    
+    if max_per_feed == 15:  # Use default if not explicitly provided
+        max_per_feed = limits_config.get("max_per_feed", 15)
+    
     all_articles = []
     for section in sections:
         sec_name = section.get("name", "General")
@@ -492,6 +527,13 @@ def fetch_all_feeds_globally(sections, max_per_feed=15):
 
 def _local_group_articles_by_section(all_articles, max_per_section=15):
     """Fallback grouping that preserves section membership without cross-section deduplication."""
+    # Load config for default values
+    config = load_config("config.json")
+    limits_config = config.get("limits", {})
+    
+    if max_per_section == 15:  # Use default if not explicitly provided
+        max_per_section = limits_config.get("max_section_articles", 8)
+    
     grouped_articles = {}
     section_order = []
     for article in all_articles:
@@ -511,6 +553,18 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section=15):
     """Use a single AI call to deduplicate across sections and filter insignificant stories."""
     global client
 
+    # Load config
+    config = load_config("config.json")
+    ai_config = config.get("ai", {})
+    limits_config = config.get("limits", {})
+    
+    gemini_model = ai_config.get("model", "gemini-3.5-flash")
+    dedup_prompt = get_config_value(ai_config, "prompts.global_deduplication",
+        "You are selecting the most important and relevant news stories for a daily newspaper. Review all article titles below, then return a JSON object mapping each section name to a list of article indices to keep. Remove duplicates and near-duplicates across sections. Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments. Return ONLY valid JSON with this shape: {\"Section Name\": [1, 3, 5]}.")
+    
+    if max_per_section == 15:  # Use default if not explicitly provided
+        max_per_section = limits_config.get("max_section_articles", 8)
+
     if not all_articles:
         return {}
 
@@ -523,21 +577,12 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section=15):
         title = article.get("title", "Untitled").strip()
         formatted_list.append(f"[{idx}] {title} ({sec_name})")
 
-    prompt = (
-        "You are selecting the most important and relevant news stories for a daily newspaper. "
-        "Review all article titles below, then return a JSON object mapping each section name to a list of article indices to keep. "
-        "Remove duplicates and near-duplicates across sections. Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. "
-        "Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. "
-        "Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. "
-        "Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments. "
-        "Return ONLY valid JSON with this shape: {\"Section Name\": [1, 3, 5]}."
-        f"\n\nTitles:\n" + "\n".join(formatted_list)
-    )
+    prompt = dedup_prompt + f"\n\nTitles:\n" + "\n".join(formatted_list)
 
     try:
         time.sleep(1)
         response = client.models.generate_content(
-            model=GEMINI_MODEL,
+            model=gemini_model,
             contents=prompt
         )
         response_text = response.text.strip()
@@ -608,6 +653,19 @@ def ai_deduplicate_articles(articles, category_name, max_items=15):
     Falls back to local_deduplicate_articles on failure or if client is missing.
     """
     global client
+    
+    # Load config
+    config = load_config("config.json")
+    ai_config = config.get("ai", {})
+    limits_config = config.get("limits", {})
+    
+    gemini_model = ai_config.get("model", "gemini-3.5-flash")
+    section_dedup_prompt = get_config_value(ai_config, "prompts.section_deduplication",
+        "Category: {category}\nTitles:\n{titles}\n\nSelect up to {max_items} of the most relevant, non-overlapping stories. Prioritize the most important and timely stories, removing duplicates and near-duplicates. Return ONLY a JSON array of indices, e.g. [1, 3, 4]:")
+    
+    if max_items == 15:  # Use default if not explicitly provided
+        max_items = limits_config.get("max_section_articles", 8)
+    
     if not articles:
         return []
 
@@ -619,18 +677,16 @@ def ai_deduplicate_articles(articles, category_name, max_items=15):
         formatted_list.append(f"[{idx}] {art.get('title')}")
 
     articles_str = "\n".join(formatted_list)
-    prompt = (
-        f"Category: {category_name}\n"
-        f"Titles:\n{articles_str}\n\n"
-        f"Select up to {max_items} of the most relevant, non-overlapping stories. "
-        f"Prioritize the most important and timely stories, removing duplicates and near-duplicates. "
-        f"Return ONLY a JSON array of indices, e.g. [1, 3, 4]:"
+    prompt = section_dedup_prompt.format(
+        category=category_name,
+        titles=articles_str,
+        max_items=max_items
     )
 
     try:
         time.sleep(1)
         response = client.models.generate_content(
-            model=GEMINI_MODEL,
+            model=gemini_model,
             contents=prompt
         )
         response_text = response.text.strip()
@@ -661,6 +717,11 @@ def ai_deduplicate_articles(articles, category_name, max_items=15):
 
 def extract_page_snippet(url):
     """Fetches raw text content from target URL for summarization."""
+    # Load config for snippet length
+    config = load_config("config.json")
+    limits_config = config.get("limits", {})
+    snippet_length = limits_config.get("page_snippet_length", 1800)
+    
     html_bytes = safe_fetch_url(url, timeout=10)
     if not html_bytes:
         return ""
@@ -669,12 +730,26 @@ def extract_page_snippet(url):
     clean_text = re.sub(r'<script.*?>.*?</script>', ' ', html_content, flags=re.DOTALL | re.IGNORECASE)
     clean_text = re.sub(r'<style.*?>.*?</style>', ' ', clean_text, flags=re.DOTALL | re.IGNORECASE)
     clean_text = re.sub(r'<[^>]+>', ' ', clean_text)
-    return " ".join(clean_text.split())[:1800]
+    return " ".join(clean_text.split())[:snippet_length]
 
 
 def summarize_hn_stories_batched(items_data):
     """Summarize multiple HN stories in a single batched Gemini call to preserve rate limits."""
     global client
+    
+    # Load config
+    config = load_config("config.json")
+    ai_config = config.get("ai", {})
+    limits_config = config.get("limits", {})
+    
+    gemini_model = ai_config.get("model", "gemini-3.5-flash")
+    hn_summary_prompt = get_config_value(ai_config, "prompts.hn_summarization",
+        "For each story listed below, write a single concise summary sentence (10-20 words). Return ONLY a JSON array of strings corresponding to each story in order. Example: [\"Summary 1.\", \"Summary 2.\"]")
+    
+    snippet_length = limits_config.get("hn_snippet_length", 400)
+    min_words = limits_config.get("hn_summary_min_words", 10)
+    max_words = limits_config.get("hn_summary_max_words", 20)
+    
     descriptions = []
 
     if client and items_data:
@@ -682,19 +757,14 @@ def summarize_hn_stories_batched(items_data):
         for idx, item in enumerate(items_data, 1):
             snippet = item.get("snippet", "")
             title = item.get("title", "")
-            stories_input.append(f"Story {idx}:\nTitle: {title}\nSnippet: {snippet[:400]}")
+            stories_input.append(f"Story {idx}:\nTitle: {title}\nSnippet: {snippet[:snippet_length]}")
 
-        prompt = (
-            "For each story listed below, write a single concise summary sentence (10-20 words).\n"
-            "Return ONLY a JSON array of strings corresponding to each story in order.\n"
-            "Example: [\"Summary 1.\", \"Summary 2.\"]\n\n" +
-            "\n\n".join(stories_input)
-        )
+        prompt = hn_summary_prompt + "\n\n" + "\n\n".join(stories_input)
 
         try:
             time.sleep(1)
             response = client.models.generate_content(
-                model=GEMINI_MODEL,
+                model=gemini_model,
                 contents=prompt
             )
             match = re.search(r'\[\s*".*?"\s*\]', response.text, flags=re.DOTALL)
@@ -851,6 +921,8 @@ def fetch_market_data(market_config):
 def build_newspaper():
     """Main function to load configuration, fetch data, deduplicate, and write newspaper.json."""
     config = load_config("config.json")
+    limits_config = config.get("limits", {})
+    max_section_articles = limits_config.get("max_section_articles", 8)
 
     output_content = {
         "generated_at": datetime.now().strftime("%B %d, %Y %I:%M %p"),
@@ -866,14 +938,14 @@ def build_newspaper():
     # Fetch all sections once, then deduplicate globally across sections.
     sections = config.get("sections", [])
     all_articles = fetch_all_feeds_globally(sections, max_per_feed=15)
-    grouped_articles = ai_global_deduplicate_and_filter(all_articles, max_per_section=MAX_SECTION_ARTICLES)
+    grouped_articles = ai_global_deduplicate_and_filter(all_articles, max_per_section=max_section_articles)
 
     for section in sections:
         sec_name = section.get("name", "General")
         filtered_articles = grouped_articles.get(sec_name, [])
         output_content["categories"][sec_name] = {
             "summary": "",
-            "articles": filtered_articles[:MAX_SECTION_ARTICLES]
+            "articles": filtered_articles[:max_section_articles]
         }
 
     # Fetch Hacker News

@@ -6,12 +6,12 @@ Technical reference for contributors and self-hosters.
 
 ## Architecture Overview
 
-| File | Role |
-|---|---|
+| File                 | Role                                                                            |
+| -------------------- | ------------------------------------------------------------------------------- |
 | `build_newspaper.py` | Main pipeline: fetches feeds, deduplicates, summarises, writes `newspaper.json` |
-| `config.json` | Declarative config for sections, feeds, tickers, and Hacker News |
-| `index.html` | Static front-end; reads `newspaper.json` at load time |
-| `test_newspaper.py` | Unit test suite (`unittest`) |
+| `config.json`        | Declarative config for sections, feeds, tickers, and Hacker News                |
+| `index.html`         | Static front-end; reads `newspaper.json` at load time                           |
+| `test_newspaper.py`  | Unit test suite (`unittest`)                                                    |
 
 ### Data flow
 
@@ -37,6 +37,28 @@ build_newspaper.py
 
 ```json
 {
+  "ai": {
+    "model": "gemini-3.5-flash",
+    "prompts": {
+      "weather": "Turn this weather data into a short 1-sentence newspaper header snippet...",
+      "word_of_day": "Pick an interesting, sophisticated English word...",
+      "daily_puzzle": "Generate a fun, clever daily puzzle...",
+      "global_deduplication": "You are selecting the most important and relevant news stories...",
+      "section_deduplication": "Category: {category}\nTitles:\n{titles}...",
+      "hn_summarization": "For each story listed below, write a single concise summary sentence..."
+    }
+  },
+  "limits": {
+    "max_section_articles": 8,
+    "max_per_feed": 15,
+    "max_feed_age_days": 1,
+    "deduplication_similarity_threshold": 0.65,
+    "word_overlap_threshold": 0.7,
+    "page_snippet_length": 1800,
+    "hn_snippet_length": 400,
+    "hn_summary_min_words": 10,
+    "hn_summary_max_words": 20
+  },
   "market": {
     "enabled": true,
     "tickers": [
@@ -73,6 +95,17 @@ build_newspaper.py
 }
 ```
 
+- **`ai.model`** — Gemini model to use for AI features (overrides `GEMINI_MODEL` env var if set)
+- **`ai.prompts.*`** — Custom prompts for various AI features (weather, word of day, puzzle, deduplication, HN summarization)
+- **`limits.max_section_articles`** — Maximum number of articles per section after deduplication
+- **`limits.max_per_feed`** — Maximum articles to fetch from each RSS feed
+- **`limits.max_feed_age_days`** — Maximum age of articles to include from feeds
+- **`limits.deduplication_similarity_threshold`** — Similarity threshold for duplicate detection (0-1)
+- **`limits.word_overlap_threshold`** — Word overlap threshold for duplicate detection (0-1)
+- **`limits.page_snippet_length`** — Character limit for page content extraction
+- **`limits.hn_snippet_length`** — Character limit for HN story snippets
+- **`limits.hn_summary_min_words`** — Minimum word count for HN AI summaries
+- **`limits.hn_summary_max_words`** — Maximum word count for HN AI summaries
 - **`market.tickers`** — any symbol supported by `yfinance`; `type` can be `"stock"` or `"crypto"`.
 - **`hacker_news.min_score`** — only stories with at least this upvote count are included.
 - **`sections[].feeds`** — one or more RSS feed URLs per section. When multiple feeds are given, deduplication runs automatically.
@@ -93,8 +126,10 @@ Enables smarter cross-feed deduplication and Hacker News batch summarisation.
 
 ```bash
 export GEMINI_API_KEY="your_api_key_here"
-export GEMINI_MODEL="gemini-2.5-flash"   # default if unset
+export GEMINI_MODEL="gemini-2.5-flash"   # optional: can also be set in config.json
 ```
+
+The AI model can also be configured in `config.json` under `ai.model`. If both are set, the config file takes precedence.
 
 Without a key the pipeline falls back to local fuzzy-matching deduplication and sentence-extraction summaries — no functionality is lost, just quality.
 
