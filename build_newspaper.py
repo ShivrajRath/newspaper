@@ -472,7 +472,9 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section=15):
     prompt = (
         "You are selecting the most important and relevant news stories for a daily newspaper. "
         "Review all article titles below, then return a JSON object mapping each section name to a list of article indices to keep. "
-        "Remove duplicates and near-duplicates across sections. Filter out insignificant stories such as gore, minor crime, single-casualty incidents, celebrity gossip, routine crime blotter items, and other clickbait. "
+        "Remove duplicates and near-duplicates across sections. Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. "
+        "Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. "
+        "Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. "
         "Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments. "
         "Return ONLY valid JSON with this shape: {\"Section Name\": [1, 3, 5]}."
         f"\n\nTitles:\n" + "\n".join(formatted_list)

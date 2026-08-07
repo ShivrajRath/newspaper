@@ -53,14 +53,13 @@
       "name": "USA",
       "feeds": [
         "https://feeds.npr.org/1001/rss.xml",
-        "https://www.cbsnews.com/latest/rss/us"
+        "https://news.google.com/rss/search?q=when:24h+location:United+States&hl=en-US&gl=US&ceid=US:en"
       ]
     },
     {
       "name": "India & Asia",
       "feeds": [
         "http://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
-        "https://www.aljazeera.com/xml/rss/all.xml",
         "https://rss.dw.com/rdf/rss-en-asia"
       ]
     },
