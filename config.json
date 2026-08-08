@@ -65,6 +65,12 @@
         "label": "VOO",
         "type": "stock",
         "exchange": "NASDAQ"
+      },
+      {
+        "symbol": "USDINR=X",
+        "label": "USD/INR",
+        "type": "currency",
+        "exchange": "FX"
       }
     ]
   },
