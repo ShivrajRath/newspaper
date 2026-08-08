@@ -407,6 +407,15 @@
                 display: none !important;
             }
 
+            /* Show mirror answer in print */
+            .puzzle-mirror-answer {
+                display: block !important;
+                font-size: 0.45rem;
+                color: #999;
+                text-align: center;
+                margin-top: 8px;
+            }
+
             .article-links a {
                 color: #111;
                 text-decoration: none;
@@ -581,6 +590,18 @@
             margin-top: 12px;
             display: none;
         }
+
+        .puzzle-mirror-answer {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 0.5rem;
+            font-weight: 600;
+            color: #ccc;
+            margin-top: 16px;
+            display: none;
+            transform: scaleX(-1);
+            writing-mode: horizontal-tb;
+            letter-spacing: 0.5px;
+        }
     </style>
 </head>
 
@@ -741,6 +762,7 @@
                             </div>
                             <p class="puzzle-hint-text" id="puzzle-hint">💡 ${puzzle.hint || ''}</p>
                             <p class="puzzle-answer-text" id="puzzle-answer">✔ ${puzzle.answer || ''}</p>
+                            <p class="puzzle-mirror-answer" id="puzzle-mirror-answer">${puzzle.answer || ''}</p>
                         </div>
                     `;
                 }
