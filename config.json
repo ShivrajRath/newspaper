@@ -16,12 +16,17 @@
       "daily_puzzle": {
         "primary": "gemini-3.5-flash-lite",
         "secondary": "gemini-3.1-flash-lite"
+      },
+      "math_puzzle": {
+        "primary": "gemini-3.5-flash-lite",
+        "secondary": "gemini-3.1-flash-lite"
       }
     },
     "prompts": {
       "weather": "Turn this weather data into a short 1-sentence newspaper header snippet (e.g. '🌤️ Frisco: High of 92°F, Low of 74°F with scattered clouds'): {data}",
       "word_of_day": "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.",
       "daily_puzzle": "Generate a fun, clever daily puzzle for a newspaper. It should be a riddle or lateral-thinking question that is not too easy and not too hard. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.",
+      "math_puzzle": "You are a creative family puzzle editor for a daily newspaper. Your task is to take a raw, mathematically verified number challenge and reframe it into an engaging family puzzle. CRITICAL CONSTRAINTS: You MUST preserve the exact input numbers and target number provided. Do NOT alter the mathematical solution or numbers under any circumstances. Return ONLY a valid JSON object with keys: \"title\", \"story_question\", and \"hint\". Do NOT wrap the JSON in Markdown code fences.",
       "article_filtering": "Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments. Only include articles published within the last 1 day to ensure freshness and relevance."
     }
   },

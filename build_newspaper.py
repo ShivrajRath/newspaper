@@ -346,6 +346,114 @@ def fetch_daily_puzzle(config, client_ref):
     return FALLBACK_PUZZLES[day_of_year % len(FALLBACK_PUZZLES)]
 
 
+def generate_family_math_puzzle(config, client_ref):
+    """Generate a family math puzzle using hybrid approach (deterministic bank + AI enrichment)."""
+    import random
+    
+    # 1. Deterministic Ground-Truth Bank (Guaranteed Solvable)
+    PUZZLE_BANK = [
+        {
+            "numbers": [4, 4, 10, 10],
+            "target": 24,
+            "solution": "(10 * 10 - 4) / 4 = 24",
+        },
+        {
+            "numbers": [1, 5, 5, 5],
+            "target": 24,
+            "solution": "5 * (5 - 1 / 5) = 24",
+        },
+        {
+            "numbers": [2, 3, 4, 6],
+            "target": 24,
+            "solution": "(2 + 4) * (6 - 3) = 24",
+        },
+        {
+            "numbers": [3, 3, 8, 8],
+            "target": 24,
+            "solution": "8 / (3 - 8 / 3) = 24",
+        },
+        {"numbers": [5, 6, 7, 8], "target": 24, "solution": "(5 + 7 - 8) * 6 = 24"},
+    ]
+
+    # Select puzzle deterministically based on day of year
+    day_of_year = datetime.now().timetuple().tm_yday
+    raw_puzzle = PUZZLE_BANK[day_of_year % len(PUZZLE_BANK)]
+    nums_str = str(raw_puzzle["numbers"])
+
+    # 2. Hardcoded Ground-Truth Fallback
+    puzzle_payload = {
+        "type": "math",
+        "title": "Math Challenge: Make 24",
+        "question": (
+            f"Use the numbers {nums_str} with +, -, *, or / to reach"
+            f" {raw_puzzle['target']}!"
+        ),
+        "solution": raw_puzzle["solution"],
+        "hint": "Try combining larger numbers first.",
+    }
+
+    # 3. LLM Refinement Step (Hybrid Enrichment)
+    if client_ref[0]:
+        ai_config = config.get("ai", {})
+        base_prompt = get_config_value(ai_config, "prompts.math_puzzle",
+            "You are a creative family puzzle editor for a daily newspaper. Your task is to take a raw, mathematically verified number challenge and reframe it into an engaging family puzzle. CRITICAL CONSTRAINTS: You MUST preserve the exact input numbers and target number provided. Do NOT alter the mathematical solution or numbers under any circumstances. Return ONLY a valid JSON object with keys: \"title\", \"story_question\", and \"hint\". Do NOT wrap the JSON in Markdown code fences.")
+        
+        full_prompt = f"""{base_prompt}
+
+====================
+EXAMPLE (ONE-SHOT)
+====================
+INPUT:
+Numbers: [3, 8, 8, 1]
+Target: 24
+Solution: (8 / (3 - 1)) * 8 = 24
+
+OUTPUT:
+{{
+  "title": "The Rocket Fuel Conundrum",
+  "story_question": "Captain Clara needs exactly 24 liters of fuel to launch her ship! Her fuel tanks hold values of 3, 8, 8, and 1. Combine all four numbers using +, -, *, or / to reach 24 so the rocket can take off!",
+  "hint": "Try grouping the numbers with division first to create a fraction!"
+}}
+
+====================
+NEW QUERY
+====================
+INPUT:
+Numbers: {nums_str}
+Target: {raw_puzzle['target']}
+Solution: {raw_puzzle['solution']}
+
+OUTPUT:"""
+
+        for model_name in [get_model_for_task(config, "math_puzzle", prefer_primary=True),
+                           get_model_for_task(config, "math_puzzle", prefer_primary=False)]:
+            try:
+                time.sleep(1)
+                response = client_ref[0].models.generate_content(
+                    model=model_name,
+                    contents=full_prompt
+                )
+                # Track rate limits from response
+                rate_limit_tracker.update_from_response(model_name, response)
+                # Clean formatting if markdown code blocks slipped through
+                clean_text = response.text.replace("```json", "").replace("```", "").strip()
+                ai_data = json.loads(clean_text)
+
+                # Merge AI narrative into payload while keeping Python solution intact
+                puzzle_payload["title"] = ai_data.get("title", puzzle_payload["title"])
+                puzzle_payload["question"] = ai_data.get("story_question", puzzle_payload["question"])
+                puzzle_payload["hint"] = ai_data.get("hint", puzzle_payload["hint"])
+                logging.info("Math puzzle AI polish successful using %s", model_name)
+                break
+            except Exception as e:
+                if _handle_ai_error(e, f"math puzzle AI polish ({model_name})", client_ref):
+                    break  # AI disabled, don't try secondary
+                logging.warning("Math puzzle AI polish failed with %s, trying secondary...", model_name)
+                continue
+
+    return puzzle_payload
+
+
 def _prepare_safe_url(url):
     """Prepare URL with proper query encoding and user agent."""
     parsed = urllib.parse.urlsplit(url)
@@ -760,6 +868,7 @@ def build_newspaper():
         "weather": fetch_weather(config, client_ref),
         "word_of_the_day": fetch_word_of_day(config, client_ref),
         "puzzle": fetch_daily_puzzle(config, client_ref),
+        "math_puzzle": generate_family_math_puzzle(config, client_ref),
         "categories": {},
         "market": {},
         "hacker_news": []
