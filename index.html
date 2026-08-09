@@ -19,7 +19,6 @@
             --text-color: #1a1a1a;
             --border-color: #dcd6c5;
             --accent-color: #2f3d3a;
-            --ticker-bg: #f6efe1;
             --muted-text: #6d6759;
             --shadow-color: rgba(26, 26, 26, 0.05);
         }
@@ -30,7 +29,6 @@
             --text-color: #f5f5f5;
             --border-color: #444444;
             --accent-color: #e8e8e8;
-            --ticker-bg: #252525;
             --muted-text: #aaaaaa;
             --shadow-color: rgba(0, 0, 0, 0.3);
         }
@@ -214,7 +212,7 @@
             flex-wrap: wrap;
             justify-content: center;
             gap: 10px;
-            background-color: var(--ticker-bg);
+            background: var(--card-bg);
             padding: 12px 15px;
             font-family: "JetBrains Mono", monospace;
             font-size: 0.82rem;
@@ -223,7 +221,7 @@
             border: 1px solid var(--border-color);
             border-radius: 14px;
             margin-bottom: 28px;
-            transition: background-color 0.3s ease, border-color 0.3s ease;
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
 
         .ticker-bar .ticker-item {
@@ -394,7 +392,6 @@
                 --text-color: #111111 !important;
                 --border-color: #dcd6c5 !important;
                 --accent-color: #2f3d3a !important;
-                --ticker-bg: #f6efe1 !important;
                 --muted-text: #6d6759 !important;
                 --shadow-color: rgba(26, 26, 26, 0.05) !important;
             }
@@ -405,7 +402,6 @@
                 --text-color: #111111 !important;
                 --border-color: #dcd6c5 !important;
                 --accent-color: #2f3d3a !important;
-                --ticker-bg: #f6efe1 !important;
                 --muted-text: #6d6759 !important;
                 --shadow-color: rgba(26, 26, 26, 0.05) !important;
             }
@@ -547,8 +543,8 @@
 
         /* ── Weather Card ───────────────────────────────────── */
         .weather-card {
-            background: transparent;
-            border: 1px solid #b8d8f0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
         }
 
         .weather-description {
@@ -557,7 +553,7 @@
             font-weight: 500;
             color: var(--accent-color);
             line-height: 1.5;
-            text-align: center;
+            text-align: left;
             padding: 8px 0;
         }
 
@@ -600,8 +596,8 @@
 
         /* ── Puzzle Card ────────────────────────────────────── */
         .puzzle-card {
-            background: transparent;
-            border: 1px solid #e2d4a0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
         }
 
         .puzzle-type-badge {
