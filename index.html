@@ -24,18 +24,47 @@
             --shadow-color: rgba(26, 26, 26, 0.05);
         }
 
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-color: #f5f5f5;
+            --border-color: #444444;
+            --accent-color: #e8e8e8;
+            --ticker-bg: #252525;
+            --muted-text: #aaaaaa;
+            --shadow-color: rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .ticker-bar .positive {
+            color: #4ade80;
+        }
+
+        [data-theme="dark"] .ticker-bar .negative {
+            color: #f87171;
+        }
+
+        [data-theme="dark"] .puzzle-reveal-btn {
+            color: #1a1a1a;
+            background: var(--accent-color);
+        }
+
+        [data-theme="dark"] .puzzle-reveal-btn:hover {
+            opacity: 0.85;
+        }
+
         * {
             box-sizing: border-box;
         }
 
         body {
             font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: transparent;
+            background: var(--bg-color);
             color: var(--text-color);
             max-width: 1100px;
             margin: 0 auto;
             padding: 30px 20px 45px;
             line-height: 1.65;
+            transition: background 0.3s ease, color 0.3s ease;
         }
 
         header {
@@ -43,6 +72,7 @@
             border-bottom: 3px double var(--accent-color);
             padding-bottom: 16px;
             margin-bottom: 24px;
+            transition: border-color 0.3s ease;
         }
 
         h1 {
@@ -77,12 +107,13 @@
             padding: 6px 10px;
             border: 1px solid var(--border-color);
             border-radius: 999px;
-            background: transparent;
+            background: var(--card-bg);
             font-family: "JetBrains Mono", monospace;
             font-size: 0.72rem;
             letter-spacing: 0.16em;
             text-transform: uppercase;
             color: var(--accent-color);
+            transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
 
         .print-icon-btn {
@@ -94,7 +125,7 @@
             padding: 0;
             border: 1px solid var(--border-color);
             border-radius: 999px;
-            background: transparent;
+            background: var(--card-bg);
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -116,16 +147,48 @@
             transition: stroke 0.2s ease;
         }
 
+        .theme-toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: var(--card-bg);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .theme-toggle-btn:hover {
+            background: var(--accent-color);
+        }
+
+        .theme-toggle-btn:hover svg {
+            stroke: white;
+        }
+
+        .theme-toggle-btn svg {
+            width: 16px;
+            height: 16px;
+            stroke: var(--accent-color);
+            stroke-width: 2;
+            fill: none;
+            transition: stroke 0.2s ease;
+        }
+
 
 
         .quote-card {
-            background: transparent;
+            background: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 14px;
             padding: 22px 24px;
             margin-bottom: 20px;
             text-align: center;
             box-shadow: 0 2px 10px var(--shadow-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
 
         .quote-text {
@@ -151,7 +214,7 @@
             flex-wrap: wrap;
             justify-content: center;
             gap: 10px;
-            background-color: transparent;
+            background-color: var(--ticker-bg);
             padding: 12px 15px;
             font-family: "JetBrains Mono", monospace;
             font-size: 0.82rem;
@@ -160,6 +223,7 @@
             border: 1px solid var(--border-color);
             border-radius: 14px;
             margin-bottom: 28px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
 
         .ticker-bar .ticker-item {
@@ -168,8 +232,9 @@
             gap: 8px;
             padding: 6px 12px;
             border-radius: 999px;
-            background: transparent;
-            border: 1px solid rgba(220, 214, 197, 0.85);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
 
         .ticker-bar .ticker-label {
@@ -215,7 +280,7 @@
         }
 
         .card {
-            background: transparent;
+            background: var(--card-bg);
             padding: 22px;
             border: 1px solid var(--border-color);
             border-radius: 12px;
@@ -226,6 +291,7 @@
             display: inline-block;
             width: 100%;
             vertical-align: top;
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
 
         .card h2 {
@@ -239,6 +305,7 @@
             border-top: 2px solid var(--border-color);
             border-bottom: 2px solid var(--border-color);
             color: var(--accent-color);
+            transition: border-color 0.3s ease, color 0.3s ease;
         }
 
         .article-links {
@@ -250,7 +317,8 @@
         .article-links .article-item {
             margin-bottom: 18px;
             padding-bottom: 16px;
-            border-bottom: 1px solid rgba(220, 214, 197, 0.65);
+            border-bottom: 1px solid var(--border-color);
+            transition: border-color 0.3s ease;
         }
 
         .article-links .article-item:last-child {
@@ -320,6 +388,28 @@
                 margin: 8mm;
             }
 
+            html {
+                --bg-color: #ffffff !important;
+                --card-bg: #ffffff !important;
+                --text-color: #111111 !important;
+                --border-color: #dcd6c5 !important;
+                --accent-color: #2f3d3a !important;
+                --ticker-bg: #f6efe1 !important;
+                --muted-text: #6d6759 !important;
+                --shadow-color: rgba(26, 26, 26, 0.05) !important;
+            }
+
+            html[data-theme] {
+                --bg-color: #ffffff !important;
+                --card-bg: #ffffff !important;
+                --text-color: #111111 !important;
+                --border-color: #dcd6c5 !important;
+                --accent-color: #2f3d3a !important;
+                --ticker-bg: #f6efe1 !important;
+                --muted-text: #6d6759 !important;
+                --shadow-color: rgba(26, 26, 26, 0.05) !important;
+            }
+
             body {
                 max-width: none;
                 padding: 0;
@@ -340,7 +430,7 @@
                 break-inside: avoid-column;
                 page-break-inside: avoid;
                 /* Strip all colored backgrounds and borders — flat white */
-                background: white !important;
+                background: var(--card-bg) !important;
                 display: block;
                 width: 100%;
                 border: none !important;
@@ -646,6 +736,20 @@
         <h1>The Daily Brief</h1>
         <div class="header-badges">
             <span class="edition-badge" id="edition-badge">Frisco, TX · Daily Edition</span>
+            <button class="theme-toggle-btn no-print" onclick="toggleTheme()" aria-label="Toggle theme">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
+                    stroke-linejoin="round" id="theme-icon">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+            </button>
             <button class="print-icon-btn no-print" onclick="window.print()" aria-label="Print">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
                     stroke-linejoin="round">
@@ -864,6 +968,43 @@
             btn.style.opacity = '0.5';
         }
 
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            const icon = document.getElementById('theme-icon');
+            if (theme === 'dark') {
+                icon.innerHTML = `
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                `;
+            } else {
+                icon.innerHTML = `
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                `;
+            }
+        }
+
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+        }
+
+        loadTheme();
         loadNewspaper();
     </script>
 </body>
