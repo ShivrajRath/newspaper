@@ -493,17 +493,12 @@
             .puzzle-reveal-btn,
             .puzzle-hint-text,
             .puzzle-answer-text,
-            .puzzle-type-badge,
-            #math-hint-btn,
-            #math-reveal-btn,
-            #math-puzzle-hint,
-            #math-puzzle-answer {
+            .puzzle-type-badge {
                 display: none !important;
             }
 
             /* Show mirror answer in print */
-            .puzzle-mirror-answer,
-            #math-puzzle-mirror-answer {
+            .puzzle-mirror-answer {
                 display: block !important;
                 font-size: 0.45rem;
                 color: #999;
@@ -697,36 +692,6 @@
             writing-mode: horizontal-tb;
             letter-spacing: 0.5px;
         }
-
-        /* Math puzzle specific styles - reuse existing puzzle styles */
-        #math-puzzle-hint {
-            font-size: 0.88rem;
-            color: var(--muted-text);
-            font-style: italic;
-            margin-top: 12px;
-            display: none;
-        }
-
-        #math-puzzle-answer {
-            font-family: "Newsreader", Georgia, serif;
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: #1f6d33;
-            margin-top: 12px;
-            display: none;
-        }
-
-        #math-puzzle-mirror-answer {
-            font-family: "Newsreader", Georgia, serif;
-            font-size: 0.5rem;
-            font-weight: 600;
-            color: #ccc;
-            margin-top: 16px;
-            display: none;
-            transform: scaleX(-1);
-            writing-mode: horizontal-tb;
-            letter-spacing: 0.5px;
-        }
     </style>
 </head>
 
@@ -905,24 +870,6 @@
                     `;
                 }
 
-                // Math Puzzle Card
-                const mathPuzzle = data.math_puzzle || {};
-                if (mathPuzzle.question) {
-                    extrasHTML += `
-                        <div class="card puzzle-card">
-                            <h2>🔢 Math Challenge</h2>
-                            <p class="puzzle-question">${mathPuzzle.question}</p>
-                            <div>
-                                <button class="puzzle-hint-toggle" id="math-hint-btn" onclick="toggleMathHint()">Show Hint</button>
-                                <button class="puzzle-reveal-btn" id="math-reveal-btn" onclick="revealMathAnswer()">Reveal Solution</button>
-                            </div>
-                            <p class="puzzle-hint-text" id="math-puzzle-hint" style="display: none;">💡 ${mathPuzzle.hint || ''}</p>
-                            <p class="puzzle-answer-text" id="math-puzzle-answer" style="display: none;">✔ ${mathPuzzle.solution || ''}</p>
-                            <p class="puzzle-mirror-answer" id="math-puzzle-mirror-answer">${mathPuzzle.solution || ''}</p>
-                        </div>
-                    `;
-                }
-
                 document.getElementById('content-grid').innerHTML = gridHTML + extrasHTML;
 
             } catch (err) {
@@ -947,22 +894,6 @@
         function revealAnswer() {
             const el = document.getElementById('puzzle-answer');
             const btn = document.getElementById('reveal-btn');
-            el.style.display = 'block';
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-        }
-
-        function toggleMathHint() {
-            const el = document.getElementById('math-puzzle-hint');
-            const btn = document.getElementById('math-hint-btn');
-            const shown = el.style.display === 'block';
-            el.style.display = shown ? 'none' : 'block';
-            btn.textContent = shown ? 'Show Hint' : 'Hide Hint';
-        }
-
-        function revealMathAnswer() {
-            const el = document.getElementById('math-puzzle-answer');
-            const btn = document.getElementById('math-reveal-btn');
             el.style.display = 'block';
             btn.disabled = true;
             btn.style.opacity = '0.5';
