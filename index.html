@@ -30,7 +30,7 @@
 
         body {
             font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: linear-gradient(180deg, #fcfaf4 0%, #f8f2e8 100%);
+            background: transparent;
             color: var(--text-color);
             max-width: 1100px;
             margin: 0 auto;
@@ -77,7 +77,7 @@
             padding: 6px 10px;
             border: 1px solid var(--border-color);
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.8);
+            background: transparent;
             font-family: "JetBrains Mono", monospace;
             font-size: 0.72rem;
             letter-spacing: 0.16em;
@@ -94,7 +94,7 @@
             padding: 0;
             border: 1px solid var(--border-color);
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.8);
+            background: transparent;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -119,7 +119,7 @@
 
 
         .quote-card {
-            background: linear-gradient(135deg, #f8efe0 0%, #fffdf8 100%);
+            background: transparent;
             border: 1px solid var(--border-color);
             border-radius: 14px;
             padding: 22px 24px;
@@ -151,7 +151,7 @@
             flex-wrap: wrap;
             justify-content: center;
             gap: 10px;
-            background-color: var(--ticker-bg);
+            background-color: transparent;
             padding: 12px 15px;
             font-family: "JetBrains Mono", monospace;
             font-size: 0.82rem;
@@ -168,7 +168,7 @@
             gap: 8px;
             padding: 6px 12px;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.9);
+            background: transparent;
             border: 1px solid rgba(220, 214, 197, 0.85);
         }
 
@@ -215,7 +215,7 @@
         }
 
         .card {
-            background: var(--card-bg);
+            background: transparent;
             padding: 22px;
             border: 1px solid var(--border-color);
             border-radius: 12px;
@@ -462,7 +462,7 @@
 
         /* ── Weather Card ───────────────────────────────────── */
         .weather-card {
-            background: linear-gradient(135deg, #e8f4fd 0%, #f0f8ff 100%);
+            background: transparent;
             border: 1px solid #b8d8f0;
         }
 
@@ -515,7 +515,7 @@
 
         /* ── Puzzle Card ────────────────────────────────────── */
         .puzzle-card {
-            background: linear-gradient(135deg, #fdf8e8 0%, #fffdf5 100%);
+            background: transparent;
             border: 1px solid #e2d4a0;
         }
 
@@ -526,7 +526,7 @@
             letter-spacing: 0.18em;
             text-transform: uppercase;
             color: #8b6914;
-            background: rgba(226, 212, 160, 0.45);
+            background: transparent;
             border: 1px solid rgba(226, 212, 160, 0.8);
             border-radius: 999px;
             padding: 3px 10px;
@@ -789,7 +789,6 @@
                     extrasHTML += `
                         <div class="card puzzle-card">
                             <h2>🧩 Daily Puzzle</h2>
-                            <span class="puzzle-type-badge">${puzzle.type || 'Riddle'}</span>
                             <p class="puzzle-question">${puzzle.question}</p>
                             <div>
                                 <button class="puzzle-hint-toggle" id="hint-btn" onclick="toggleHint()">Show Hint</button>
@@ -808,7 +807,6 @@
                     extrasHTML += `
                         <div class="card puzzle-card">
                             <h2>🔢 Math Challenge</h2>
-                            <span class="puzzle-type-badge">${mathPuzzle.type || 'Math'}</span>
                             <p class="puzzle-question">${mathPuzzle.question}</p>
                             <div>
                                 <button class="puzzle-hint-toggle" id="math-hint-btn" onclick="toggleMathHint()">Show Hint</button>
