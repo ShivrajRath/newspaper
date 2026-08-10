@@ -26,7 +26,7 @@
     }
   },
   "limits": {
-    "max_section_articles": 8,
+    "max_section_articles": 5,
     "max_per_feed": 15,
     "max_feed_age_days": 1,
     "deduplication_similarity_threshold": 0.65,
@@ -85,23 +85,22 @@
       "name": "World News",
       "feeds": [
         "http://feeds.bbci.co.uk/news/world/rss.xml",
-        "https://www.theguardian.com/world/rss",
-        "https://www.economist.com/the-world-this-week/rss.xml"
+        "https://www.aljazeera.com/xml/rss/all.xml",
+        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
       ]
     },
     {
       "name": "USA",
       "feeds": [
-        "https://feeds.npr.org/1001/rss.xml",
-        "https://www.pbs.org/newshour/feeds/rss/headlines"
+        "https://www.cbsnews.com/latest/rss/us",
+        "https://rss.nytimes.com/services/xml/rss/nyt/US.xml"
       ]
     },
     {
       "name": "India & Asia",
       "feeds": [
         "http://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
-        "https://rss.dw.com/rdf/rss-en-asia",
-        "https://news.google.com/rss/search?q=Odisha+when:1d+-video+-youtube&hl=en-IN&gl=IN&ceid=IN:en"
+        "https://rss.dw.com/rdf/rss-en-asia"
       ]
     },
     {
