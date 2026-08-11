@@ -806,7 +806,7 @@
                         const title = stripHtml(hn.title || 'Untitled');
                         const desc = stripHtml(hn.description || '');
                         const titleHTML = `<a href="${hn.url}" target="_blank" rel="noopener noreferrer"><strong>${title}</strong></a>`;
-                        return `<div class="article-item">${titleHTML}${desc ? `<p>${desc}</p>` : ''} <small style="color: #666;">(${hn.score} pts)</small></div>`;
+                        return `<div class="article-item">${titleHTML}${desc ? `<p>${desc}</p>` : ''}</div>`;
                     }).join('');
 
                     gridHTML += `
