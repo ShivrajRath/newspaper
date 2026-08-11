@@ -122,6 +122,10 @@
       ]
     },
     {
+      "name": "Health & Fitness",
+      "feeds": ["https://www.sciencedaily.com/rss/health_medicine.xml"]
+    },
+    {
       "name": "Local & Regional",
       "feeds": [
         "https://www.wfaa.com/feeds/syndication/rss/news/local",
