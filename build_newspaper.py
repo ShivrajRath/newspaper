@@ -9,6 +9,7 @@ import urllib.request
 import urllib.parse
 import difflib
 import time
+import random
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from constants import WMO_CODES, FALLBACK_WORDS, FALLBACK_PUZZLES
@@ -259,8 +260,29 @@ def fetch_weather(config, client_ref):
 def fetch_word_of_day(config, client_ref):
     """Generate Word of the Day using Gemini AI, with Free Dictionary API fallback."""
     ai_config = config.get("ai", {})
-    word_prompt = get_config_value(ai_config, "prompts.word_of_day",
-        "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.")
+    
+    # Add randomness to the prompt to vary LLM outputs
+    random_seeds = [
+        "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.",
+        "Select a unique, elegant English word that would work well as a newspaper's Word of the Day. Steer clear of overly technical terms. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.",
+        "Choose a sophisticated yet accessible English word for a daily newspaper feature. Avoid highly specialized jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.",
+        "Generate an interesting, refined English word perfect for a newspaper Word of the Day. Don't pick extremely obscure words. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word."
+    ]
+    
+    base_prompt = get_config_value(ai_config, "prompts.word_of_day", random_seeds[0])
+    
+    # If using default prompt, add randomness by selecting a variation
+    if base_prompt == random_seeds[0]:
+        word_prompt = random.choice(random_seeds)
+    else:
+        # Add a random suffix to custom prompts to vary outputs
+        random_suffixes = [
+            " Be creative and unpredictable in your choice.",
+            " Pick something different from common words.",
+            " Select a word with interesting etymology or usage.",
+            " Choose a word that's thought-provoking."
+        ]
+        word_prompt = base_prompt + random.choice(random_suffixes)
 
     # Try Gemini AI first with primary then secondary model
     if client_ref[0]:
@@ -286,9 +308,8 @@ def fetch_word_of_day(config, client_ref):
                 logging.warning("Primary model %s failed, trying secondary...", model_name)
                 continue
 
-    # Fallback: pick word from curated list by day-of-year, look up definition
-    day_of_year = datetime.now().timetuple().tm_yday
-    word = FALLBACK_WORDS[day_of_year % len(FALLBACK_WORDS)]
+    # Fallback: pick word from curated list using random selection instead of day-of-year
+    word = random.choice(FALLBACK_WORDS)
     try:
         with safe_urlopen(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=10) as resp:
             entries = json.loads(resp.read().decode())
@@ -315,8 +336,29 @@ def fetch_word_of_day(config, client_ref):
 def fetch_daily_puzzle(config, client_ref):
     """Generate a daily puzzle (riddle or trivia) using Gemini AI, with a fallback."""
     ai_config = config.get("ai", {})
-    puzzle_prompt = get_config_value(ai_config, "prompts.daily_puzzle",
-        "Generate a fun, clever daily puzzle for a newspaper. It should be a riddle or lateral-thinking question that is not too easy and not too hard. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.")
+    
+    # Add randomness to the prompt to vary LLM outputs
+    random_seeds = [
+        "Generate a fun, clever daily puzzle for a newspaper. It should be a riddle or lateral-thinking question that is not too easy and not too hard. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.",
+        "Create an engaging daily puzzle for a newspaper - a riddle or brain teaser that's moderately challenging. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.",
+        "Design a clever daily newspaper puzzle - a riddle or lateral thinking problem with medium difficulty. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.",
+        "Come up with an entertaining daily puzzle for a newspaper readers. Make it a riddle that's neither too simple nor too complex. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words."
+    ]
+    
+    base_prompt = get_config_value(ai_config, "prompts.daily_puzzle", random_seeds[0])
+    
+    # If using default prompt, add randomness by selecting a variation
+    if base_prompt == random_seeds[0]:
+        puzzle_prompt = random.choice(random_seeds)
+    else:
+        # Add a random suffix to custom prompts to vary outputs
+        random_suffixes = [
+            " Make it unique and creative.",
+            " Try something different from classic riddles.",
+            " Focus on wordplay or lateral thinking.",
+            " Create something that makes readers think."
+        ]
+        puzzle_prompt = base_prompt + random.choice(random_suffixes)
 
     if client_ref[0]:
         for model_name in [get_model_for_task(config, "daily_puzzle", prefer_primary=True), 
@@ -341,9 +383,8 @@ def fetch_daily_puzzle(config, client_ref):
                 logging.warning("Primary model %s failed, trying secondary...", model_name)
                 continue
 
-    # Fallback: pick from curated list by day-of-year
-    day_of_year = datetime.now().timetuple().tm_yday
-    return FALLBACK_PUZZLES[day_of_year % len(FALLBACK_PUZZLES)]
+    # Fallback: pick from curated list using random selection instead of day-of-year
+    return random.choice(FALLBACK_PUZZLES)
 
 
 
