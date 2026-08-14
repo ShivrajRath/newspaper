@@ -308,8 +308,9 @@ def fetch_word_of_day(config, client_ref):
                 logging.warning("Primary model %s failed, trying secondary...", model_name)
                 continue
 
-    # Fallback: pick word from curated list using random selection instead of day-of-year
-    word = random.choice(FALLBACK_WORDS)
+    # Fallback: pick word from curated list using day-of-year for consistency
+    day_of_year = datetime.now().timetuple().tm_yday
+    word = FALLBACK_WORDS[day_of_year % len(FALLBACK_WORDS)]
     try:
         with safe_urlopen(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=10) as resp:
             entries = json.loads(resp.read().decode())
@@ -383,8 +384,9 @@ def fetch_daily_puzzle(config, client_ref):
                 logging.warning("Primary model %s failed, trying secondary...", model_name)
                 continue
 
-    # Fallback: pick from curated list using random selection instead of day-of-year
-    return random.choice(FALLBACK_PUZZLES)
+    # Fallback: pick from curated list using day-of-year for consistency
+    day_of_year = datetime.now().timetuple().tm_yday
+    return FALLBACK_PUZZLES[day_of_year % len(FALLBACK_PUZZLES)]
 
 
 

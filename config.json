@@ -2,8 +2,8 @@
   "ai": {
     "models": {
       "article_filtering": {
-        "primary": "gemini-3.6-flash",
-        "secondary": "gemini-3.5-flash"
+        "primary": "gemini-3.7-flash",
+        "secondary": "gemini-3.6-flash"
       },
       "weather": {
         "primary": "gemini-3.5-flash-lite",
