@@ -334,23 +334,76 @@ def fetch_word_of_day(config, client_ref):
     return {"word": word, "part_of_speech": "", "definition": "", "example": ""}
 
 
+PUZZLE_HISTORY_FILE = "puzzle_history.json"
+PUZZLE_HISTORY_LIMIT = 60  # Keep track of the last 60 puzzles (~2 months)
+
+
+def _load_puzzle_history():
+    """Load the list of recently used puzzle questions from disk."""
+    if os.path.exists(PUZZLE_HISTORY_FILE):
+        try:
+            with open(PUZZLE_HISTORY_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+        except Exception as e:
+            logging.warning("Could not load puzzle history: %s", e)
+    return []
+
+
+def _save_puzzle_history(history):
+    """Persist the puzzle history list to disk, trimming to the last PUZZLE_HISTORY_LIMIT entries."""
+    try:
+        trimmed = history[-PUZZLE_HISTORY_LIMIT:]
+        with open(PUZZLE_HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(trimmed, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logging.warning("Could not save puzzle history: %s", e)
+
+
+def _is_puzzle_duplicate(question, history, threshold=0.7):
+    """Return True if the question is too similar to any entry in the history."""
+    norm_q = re.sub(r'[^\w\s]', '', question.lower())
+    for past_q in history:
+        norm_past = re.sub(r'[^\w\s]', '', past_q.lower())
+        ratio = difflib.SequenceMatcher(None, norm_q, norm_past).ratio()
+        if ratio >= threshold:
+            return True
+    return False
+
+
 def fetch_daily_puzzle(config, client_ref):
-    """Generate a daily puzzle (riddle or trivia) using Gemini AI, with a fallback."""
-    ai_config = config.get("ai", {})
+    """Generate a unique daily puzzle (riddle or trivia) using Gemini AI, with a fallback.
     
+    Maintains a history of recently used puzzle questions to avoid repetition.
+    """
+    ai_config = config.get("ai", {})
+    history = _load_puzzle_history()
+
+    # Build the "do not repeat" context for the AI prompt
+    avoid_clause = ""
+    if history:
+        # Only include the most recent 30 in the prompt to keep it concise
+        recent = history[-30:]
+        avoid_list = "\n".join(f"- {q}" for q in recent)
+        avoid_clause = (
+            f"\n\nIMPORTANT: Do NOT generate any of the following puzzles that were recently used. "
+            f"Create something completely different:\n{avoid_list}"
+        )
+
     # Add randomness to the prompt to vary LLM outputs
     random_seeds = [
-        "Generate a fun, clever daily puzzle for a newspaper. It should be a riddle or lateral-thinking question that is not too easy and not too hard. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.",
-        "Create an engaging daily puzzle for a newspaper - a riddle or brain teaser that's moderately challenging. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.",
-        "Design a clever daily newspaper puzzle - a riddle or lateral thinking problem with medium difficulty. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words.",
-        "Come up with an entertaining daily puzzle for a newspaper readers. Make it a riddle that's neither too simple nor too complex. Return ONLY a JSON object with exactly these fields: {\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"} Keep the question under 30 words, and the answer under 6 words."
+        "Generate a fun, clever daily puzzle for a newspaper. It should be a riddle or lateral-thinking question that is not too easy and not too hard. Return ONLY a JSON object with exactly these fields: {{\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}} Keep the question under 30 words, and the answer under 6 words.",
+        "Create an engaging daily puzzle for a newspaper - a riddle or brain teaser that's moderately challenging. Return ONLY a JSON object with exactly these fields: {{\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}} Keep the question under 30 words, and the answer under 6 words.",
+        "Design a clever daily newspaper puzzle - a riddle or lateral thinking problem with medium difficulty. Return ONLY a JSON object with exactly these fields: {{\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}} Keep the question under 30 words, and the answer under 6 words.",
+        "Come up with an entertaining daily puzzle for newspaper readers. Make it a riddle that's neither too simple nor too complex. Return ONLY a JSON object with exactly these fields: {{\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}} Keep the question under 30 words, and the answer under 6 words."
     ]
-    
+
     base_prompt = get_config_value(ai_config, "prompts.daily_puzzle", random_seeds[0])
-    
+
     # If using default prompt, add randomness by selecting a variation
     if base_prompt == random_seeds[0]:
-        puzzle_prompt = random.choice(random_seeds)
+        puzzle_prompt = random.choice(random_seeds) + avoid_clause
     else:
         # Add a random suffix to custom prompts to vary outputs
         random_suffixes = [
@@ -359,10 +412,10 @@ def fetch_daily_puzzle(config, client_ref):
             " Focus on wordplay or lateral thinking.",
             " Create something that makes readers think."
         ]
-        puzzle_prompt = base_prompt + random.choice(random_suffixes)
+        puzzle_prompt = base_prompt + random.choice(random_suffixes) + avoid_clause
 
     if client_ref[0]:
-        for model_name in [get_model_for_task(config, "daily_puzzle", prefer_primary=True), 
+        for model_name in [get_model_for_task(config, "daily_puzzle", prefer_primary=True),
                            get_model_for_task(config, "daily_puzzle", prefer_primary=False)]:
             try:
                 time.sleep(1)
@@ -376,19 +429,33 @@ def fetch_daily_puzzle(config, client_ref):
                 if match:
                     parsed = json.loads(match.group(0))
                     if all(k in parsed for k in ("type", "question", "answer", "hint")):
-                        logging.info("Daily puzzle from AI using %s: %s", model_name, parsed["question"][:40])
-                        return parsed
+                        question = parsed["question"]
+                        if _is_puzzle_duplicate(question, history):
+                            logging.warning("AI returned a duplicate puzzle; retrying or falling back.")
+                        else:
+                            logging.info("Daily puzzle from AI using %s: %s", model_name, question[:40])
+                            history.append(question)
+                            _save_puzzle_history(history)
+                            return parsed
             except Exception as e:
                 if _handle_ai_error(e, f"puzzle generation ({model_name})", client_ref):
                     break  # AI disabled, don't try secondary
                 logging.warning("Primary model %s failed, trying secondary...", model_name)
                 continue
 
-    # Fallback: pick from curated list using day-of-year for consistency
+    # Fallback: pick from curated list, skipping recently used ones
+    used_questions = set(history)
     day_of_year = datetime.now().timetuple().tm_yday
+    # Start from the day-of-year offset and walk until we find an unused puzzle
+    for offset in range(len(FALLBACK_PUZZLES)):
+        candidate = FALLBACK_PUZZLES[(day_of_year + offset) % len(FALLBACK_PUZZLES)]
+        if not _is_puzzle_duplicate(candidate["question"], list(used_questions)):
+            history.append(candidate["question"])
+            _save_puzzle_history(history)
+            return candidate
+
+    # All fallbacks exhausted (very unlikely) — just return day-of-year entry
     return FALLBACK_PUZZLES[day_of_year % len(FALLBACK_PUZZLES)]
-
-
 
 
 
