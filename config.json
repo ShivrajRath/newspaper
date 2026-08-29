@@ -105,6 +105,13 @@
       ]
     },
     {
+      "name": "Local & Regional",
+      "feeds": [
+        "https://www.wfaa.com/feeds/syndication/rss/news/local",
+        "https://news.google.com/rss/search?q=Frisco+Texas+when:1d+-video+-youtube&hl=en-US&gl=US&ceid=US:en"
+      ]
+    },
+    {
       "name": "Science & Tech",
       "feeds": [
         "https://www.sciencedaily.com/rss/top/science.xml",
@@ -117,13 +124,6 @@
     {
       "name": "Health & Fitness",
       "feeds": ["https://www.sciencedaily.com/rss/health_medicine.xml"]
-    },
-    {
-      "name": "Local & Regional",
-      "feeds": [
-        "https://www.wfaa.com/feeds/syndication/rss/news/local",
-        "https://news.google.com/rss/search?q=Frisco+Texas+when:1d+-video+-youtube&hl=en-US&gl=US&ceid=US:en"
-      ]
     }
   ]
 }
