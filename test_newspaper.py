@@ -154,9 +154,7 @@ class TestNewspaperBuilder(unittest.TestCase):
              patch.object(builder_module, "fetch_hacker_news", return_value=[]), \
              patch.object(builder_module, "fetch_market_data", return_value={}), \
              patch.object(builder_module, "initialize_ai_client", return_value=FakeClient()), \
-             patch.object(builder_module, "fetch_weather", return_value={}), \
-             patch.object(builder_module, "fetch_word_of_day", return_value={}), \
-             patch.object(builder_module, "fetch_daily_puzzle", return_value={}):
+             patch.object(builder_module, "fetch_weather", return_value={}):
             builder_module.build_newspaper()
 
         with open("newspaper.json", "r", encoding="utf-8") as f:
@@ -199,6 +197,82 @@ class TestNewspaperBuilder(unittest.TestCase):
         self.assertIn("market", data)
         self.assertIn("hacker_news", data)
         self.assertIn("quote", data)
+        self.assertIn("word_of_day", data)
+
+    def test_fallback_words_count_and_structure(self):
+        from constants import FALLBACK_WORDS
+        self.assertEqual(len(FALLBACK_WORDS), 100)
+        for item in FALLBACK_WORDS:
+            self.assertIn("word", item)
+            self.assertIn("part_of_speech", item)
+            self.assertIn("definition", item)
+            self.assertIn("example", item)
+            self.assertTrue(bool(item["word"].strip()))
+            self.assertTrue(bool(item["definition"].strip()))
+
+    def test_fetch_word_of_the_day_wordnik_success(self):
+        class FakeResponse:
+            def __init__(self, data):
+                self._data = data
+
+            def read(self):
+                return json.dumps(self._data).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        wordnik_payload = {
+            "word": "pulchritudinous",
+            "definitions": [
+                {
+                    "text": "Characterized by physical beauty.",
+                    "partOfSpeech": "adjective"
+                }
+            ],
+            "examples": [
+                {
+                    "text": "The breathtaking landscape was truly pulchritudinous."
+                }
+            ]
+        }
+
+        with patch.dict(os.environ, {"WORDNIK_API_KEY": "fake_test_key"}), \
+             patch.object(builder_module, "safe_urlopen", return_value=FakeResponse(wordnik_payload)):
+            result = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": True}})
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["word"], "pulchritudinous")
+        self.assertEqual(result["part_of_speech"], "adjective")
+        self.assertEqual(result["definition"], "Characterized by physical beauty.")
+        self.assertEqual(result["example"], "The breathtaking landscape was truly pulchritudinous.")
+        self.assertEqual(result["source"], "Wordnik")
+
+    def test_fetch_word_of_the_day_fallback_when_no_api_key(self):
+        with patch.dict(os.environ, {}, clear=True), \
+             patch.object(builder_module, "WORDNIK_API_KEY", None):
+            result = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": True}})
+
+        self.assertIsNotNone(result)
+        self.assertTrue(bool(result["word"]))
+        self.assertTrue(bool(result["definition"]))
+        self.assertEqual(result["source"], "")
+
+    def test_fetch_word_of_the_day_fallback_on_api_error(self):
+        with patch.dict(os.environ, {"WORDNIK_API_KEY": "fake_test_key"}), \
+             patch.object(builder_module, "safe_urlopen", side_effect=Exception("API connection timeout")):
+            result = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": True}})
+
+        self.assertIsNotNone(result)
+        self.assertTrue(bool(result["word"]))
+        self.assertTrue(bool(result["definition"]))
+        self.assertEqual(result["source"], "")
+
+    def test_fetch_word_of_the_day_disabled(self):
+        result = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": False}})
+        self.assertIsNone(result)
 
 
 if __name__ == "__main__":

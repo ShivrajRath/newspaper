@@ -41,14 +41,7 @@
             color: #f87171;
         }
 
-        [data-theme="dark"] .puzzle-reveal-btn {
-            color: #1a1a1a;
-            background: var(--accent-color);
-        }
 
-        [data-theme="dark"] .puzzle-reveal-btn:hover {
-            opacity: 0.85;
-        }
 
         * {
             box-sizing: border-box;
@@ -478,29 +471,7 @@
                 font-size: 0.95rem;
             }
 
-            /* Strip puzzle card coloured stat boxes */
-            .puzzle-stat {
-                background: transparent !important;
-                border: none !important;
-            }
 
-            /* Hide puzzle interactive buttons and answer/hint in print */
-            .puzzle-hint-toggle,
-            .puzzle-reveal-btn,
-            .puzzle-hint-text,
-            .puzzle-answer-text,
-            .puzzle-type-badge {
-                display: none !important;
-            }
-
-            /* Show mirror answer in print */
-            .puzzle-mirror-answer {
-                display: block !important;
-                font-size: 0.45rem;
-                color: #999;
-                text-align: center;
-                margin-top: 8px;
-            }
 
             .article-links a {
                 color: #111;
@@ -558,136 +529,67 @@
         }
 
         /* ── Word of the Day Card ───────────────────────────── */
-        .wotd-word {
-            font-family: "Newsreader", Georgia, serif;
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--accent-color);
-            margin: 0 0 2px 0;
-            line-height: 1.1;
-        }
-
-        .wotd-pos {
-            font-family: "JetBrains Mono", monospace;
-            font-size: 0.78rem;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: var(--muted-text);
-            display: block;
-            margin-bottom: 12px;
-        }
-
-        .wotd-definition {
-            font-size: 0.95rem;
-            line-height: 1.7;
-            color: var(--text-color);
-            margin-bottom: 10px;
-        }
-
-        .wotd-example {
-            font-family: "Newsreader", Georgia, serif;
-            font-size: 0.93rem;
-            font-style: italic;
-            color: var(--muted-text);
-            border-left: 3px solid var(--border-color);
-            padding-left: 12px;
-            margin: 0;
-        }
-
-        /* ── Puzzle Card ────────────────────────────────────── */
-        .puzzle-card {
+        .word-card {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
         }
 
-        .puzzle-type-badge {
+        .word-header {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .word-title {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            letter-spacing: 0.03em;
+        }
+
+        .word-pos {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.78rem;
+            font-style: italic;
+            color: var(--muted-text);
+            padding: 2px 6px;
+            background: rgba(220, 214, 197, 0.25);
+            border-radius: 4px;
+        }
+
+        .word-def {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            color: var(--text-color);
+            margin: 0 0 10px 0;
+        }
+
+        .word-example {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 0.92rem;
+            font-style: italic;
+            color: var(--muted-text);
+            border-left: 2px solid var(--border-color);
+            padding-left: 10px;
+            margin: 8px 0 0 0;
+            line-height: 1.5;
+        }
+
+        .word-source {
             display: inline-block;
             font-family: "JetBrains Mono", monospace;
-            font-size: 0.68rem;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-            color: #8b6914;
-            background: transparent;
-            border: 1px solid rgba(226, 212, 160, 0.8);
-            border-radius: 999px;
-            padding: 3px 10px;
-            margin-bottom: 14px;
-        }
-
-        .puzzle-question {
-            font-family: "Newsreader", Georgia, serif;
-            font-size: 1.08rem;
-            line-height: 1.6;
-            color: var(--accent-color);
-            margin-bottom: 16px;
-            font-weight: 500;
-        }
-
-        .puzzle-hint-toggle {
-            font-family: "JetBrains Mono", monospace;
-            font-size: 0.78rem;
-            letter-spacing: 0.1em;
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
             color: var(--muted-text);
-            background: none;
-            border: 1px solid var(--border-color);
-            border-radius: 999px;
-            padding: 5px 14px;
-            cursor: pointer;
-            margin-right: 8px;
-            transition: background 0.2s;
-        }
-
-        .puzzle-hint-toggle:hover {
-            background: rgba(220, 214, 197, 0.35);
-        }
-
-        .puzzle-reveal-btn {
-            font-family: "JetBrains Mono", monospace;
-            font-size: 0.78rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: white;
-            background: var(--accent-color);
-            border: none;
-            border-radius: 999px;
-            padding: 5px 14px;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-
-        .puzzle-reveal-btn:hover {
-            opacity: 0.85;
-        }
-
-        .puzzle-hint-text {
-            font-size: 0.88rem;
-            color: var(--muted-text);
-            font-style: italic;
             margin-top: 12px;
-            display: none;
         }
 
-        .puzzle-answer-text {
-            font-family: "Newsreader", Georgia, serif;
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: #1f6d33;
-            margin-top: 12px;
-            display: none;
-        }
 
-        .puzzle-mirror-answer {
-            font-family: "Newsreader", Georgia, serif;
-            font-size: 0.5rem;
-            font-weight: 600;
-            color: #ccc;
-            margin-top: 16px;
-            display: none;
-            transform: scaleX(-1);
-            writing-mode: horizontal-tb;
-            letter-spacing: 0.5px;
-        }
     </style>
 </head>
 
@@ -817,8 +719,36 @@
                     `;
                 }
 
-                // ── Render Extras (Weather · Word of Day · Puzzle) ──
+                // ── Render Extras (Weather & Word of the Day) ──
                 let extrasHTML = '';
+
+                // Word of the Day Card
+                const wod = data.word_of_day;
+                if (wod && wod.word) {
+                    const word = stripHtml(wod.word);
+                    const pos = stripHtml(wod.part_of_speech || '');
+                    const def = stripHtml(wod.definition || '');
+                    const ex = stripHtml(wod.example || '');
+                    const source = wod.source ? stripHtml(wod.source).trim() : '';
+
+                    let sourceHTML = '';
+                    if (source.toLowerCase() === 'wordnik') {
+                        sourceHTML = `<div class="word-source">Source: Wordnik</div>`;
+                    }
+
+                    extrasHTML += `
+                        <div class="card word-card">
+                            <h2>📖 Word of the Day</h2>
+                            <div class="word-header">
+                                <span class="word-title">${word}</span>
+                                ${pos ? `<span class="word-pos">${pos}</span>` : ''}
+                            </div>
+                            ${def ? `<p class="word-def">${def}</p>` : ''}
+                            ${ex ? `<p class="word-example">"${ex}"</p>` : ''}
+                            ${sourceHTML}
+                        </div>
+                    `;
+                }
 
                 // Weather Card
                 const wx = data.weather || {};
@@ -827,41 +757,6 @@
                         <div class="card weather-card">
                             <h2>📍 ${wx.location || 'Frisco, TX'} Weather</h2>
                             <div class="weather-description">${wx.description}</div>
-                        </div>
-                    `;
-                }
-
-                // Word of the Day Card
-                const wotd = data.word_of_the_day || {};
-                if (wotd.word) {
-                    const posHtml = wotd.part_of_speech ? `<span class="wotd-pos">${wotd.part_of_speech}</span>` : '';
-                    const defHtml = wotd.definition ? `<p class="wotd-definition">${wotd.definition}</p>` : '';
-                    const exHtml = wotd.example ? `<p class="wotd-example">“${wotd.example}”</p>` : '';
-                    extrasHTML += `
-                        <div class="card">
-                            <h2>📖 Word of the Day</h2>
-                            <p class="wotd-word">${wotd.word}</p>
-                            ${posHtml}
-                            ${defHtml}
-                            ${exHtml}
-                        </div>
-                    `;
-                }
-
-                // Daily Puzzle Card
-                const puzzle = data.puzzle || {};
-                if (puzzle.question) {
-                    extrasHTML += `
-                        <div class="card puzzle-card">
-                            <h2>🧩 Daily Puzzle</h2>
-                            <p class="puzzle-question">${puzzle.question}</p>
-                            <div>
-                                <button class="puzzle-hint-toggle" id="hint-btn" onclick="toggleHint()">Show Hint</button>
-                                <button class="puzzle-reveal-btn" id="reveal-btn" onclick="revealAnswer()">Reveal Answer</button>
-                            </div>
-                            <p class="puzzle-hint-text" id="puzzle-hint" style="display: none;">💡 ${puzzle.hint || ''}</p>
-                            <p class="puzzle-answer-text" id="puzzle-answer" style="display: none;">✔ ${puzzle.answer || ''}</p>
-                            <p class="puzzle-mirror-answer" id="puzzle-mirror-answer">${puzzle.answer || ''}</p>
                         </div>
                     `;
                 }
@@ -877,22 +772,6 @@
                     </div>
                 `;
             }
-        }
-
-        function toggleHint() {
-            const el = document.getElementById('puzzle-hint');
-            const btn = document.getElementById('hint-btn');
-            const shown = el.style.display === 'block';
-            el.style.display = shown ? 'none' : 'block';
-            btn.textContent = shown ? 'Show Hint' : 'Hide Hint';
-        }
-
-        function revealAnswer() {
-            const el = document.getElementById('puzzle-answer');
-            const btn = document.getElementById('reveal-btn');
-            el.style.display = 'block';
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
         }
 
         function toggleTheme() {

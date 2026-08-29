@@ -35,15 +35,8 @@ jobs:
       - name: Run Builder Script
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          WORDNIK_API_KEY: ${{ secrets.WORDNIK_API_KEY }}
         run: python build_newspaper.py
-
-      - name: Commit Puzzle History
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add puzzle_history.json || true
-          git diff --cached --quiet || git commit -m "chore: update puzzle history [skip ci]"
-          git push || true
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3

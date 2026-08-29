@@ -41,8 +41,6 @@ build_newspaper.py
     "model": "gemini-3.5-flash",
     "prompts": {
       "weather": "Turn this weather data into a short 1-sentence newspaper header snippet...",
-      "word_of_day": "Pick an interesting, sophisticated English word...",
-      "daily_puzzle": "Generate a fun, clever daily puzzle...",
       "global_deduplication": "You are selecting the most important and relevant news stories...",
       "section_deduplication": "Category: {category}\nTitles:\n{titles}...",
       "hn_summarization": "For each story listed below, write a single concise summary sentence..."
@@ -98,8 +96,6 @@ build_newspaper.py
 - **`ai.model`** — Gemini model to use for AI features (overrides `GEMINI_MODEL` env var if set)
 - **`ai.prompts.article_filtering`** — Custom filtering instructions for AI to control which news stories are included (e.g., exclude certain topics, prioritize certain types of stories)
 - **`ai.prompts.weather`** — Custom prompt for weather description generation
-- **`ai.prompts.word_of_day`** — Custom prompt for word of the day generation
-- **`ai.prompts.daily_puzzle`** — Custom prompt for daily puzzle generation
 - **`limits.max_section_articles`** — Maximum number of articles per section after deduplication
 - **`limits.max_per_feed`** — Maximum articles to fetch from each RSS feed
 - **`limits.max_feed_age_days`** — Maximum age of articles to include from feeds
@@ -140,14 +136,6 @@ The AI models are configured per-task in `config.json` under `ai.models`. Each t
     "weather": {
       "primary": "gemini-3.5-flash-lite",
       "secondary": "gemini-3.1-flash-lite"
-    },
-    "word_of_day": {
-      "primary": "gemini-3.5-flash-lite",
-      "secondary": "gemini-3.1-flash-lite"
-    },
-    "daily_puzzle": {
-      "primary": "gemini-3.5-flash-lite",
-      "secondary": "gemini-3.1-flash-lite"
     }
   },
   "prompts": { ... }
@@ -157,6 +145,16 @@ The AI models are configured per-task in `config.json` under `ai.models`. Each t
 **Rate-limit tracking**: The pipeline now tracks actual rate limit usage from API responses (via `usage_metadata`) and logs it at the end of each run.
 
 Without a key the pipeline falls back to local fuzzy-matching deduplication and sentence-extraction summaries — no functionality is lost, just quality.
+
+### Wordnik Word of the Day (optional)
+
+Enables fetching the daily featured word, definitions, and usage examples from the Wordnik API.
+
+```bash
+export WORDNIK_API_KEY="your_wordnik_api_key_here"
+```
+
+Without an API key (or if the API is unreachable), the pipeline gracefully falls back to a curated collection of 100 sophisticated words, with no source badge displayed. When fetched from Wordnik, the source is displayed as Wordnik.
 
 ---
 
@@ -174,7 +172,7 @@ Then open `index.html` in a browser. The file reads `newspaper.json` locally —
 
 The workflow in `.github/workflows/deploy.yml` runs the pipeline on a schedule and publishes `index.html` + `newspaper.json` to GitHub Pages.
 
-Set the `GEMINI_API_KEY` secret in your repository settings to enable AI features in CI.
+Set the `GEMINI_API_KEY` and `WORDNIK_API_KEY` secrets in your repository settings to enable AI and Word of the Day features in CI.
 
 ---
 

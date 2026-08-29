@@ -12,11 +12,12 @@ import time
 import random
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
-from constants import WMO_CODES, FALLBACK_WORDS, FALLBACK_PUZZLES
+from constants import WMO_CODES, FALLBACK_WORDS
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+WORDNIK_API_KEY = os.environ.get("WORDNIK_API_KEY")
 
 
 class RateLimitTracker:
@@ -165,6 +166,65 @@ def fetch_quote_of_day():
     }
 
 
+def fetch_word_of_the_day(config=None):
+    """Fetch Word of the Day from Wordnik API, falling back to 100 curated fallback words."""
+    if config:
+        wod_config = config.get("word_of_day", {})
+        if not wod_config.get("enabled", True):
+            return None
+
+    api_key = os.environ.get("WORDNIK_API_KEY") or WORDNIK_API_KEY
+    if api_key:
+        try:
+            url = f"https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key={api_key}"
+            with safe_urlopen(url, timeout=15) as resp:
+                data = json.loads(resp.read().decode())
+                word = clean_html(data.get("word", "")).strip()
+                definitions = data.get("definitions") or []
+                def_text = ""
+                part_of_speech = ""
+                if definitions and isinstance(definitions, list):
+                    def_text = clean_html(definitions[0].get("text", "")).strip()
+                    part_of_speech = clean_html(definitions[0].get("partOfSpeech", "")).strip()
+                
+                examples = data.get("examples") or []
+                example_text = ""
+                if examples and isinstance(examples, list):
+                    example_text = clean_html(examples[0].get("text", "")).strip()
+
+                if word and def_text:
+                    logging.info("Successfully fetched Word of the Day from Wordnik: %s", word)
+                    return {
+                        "word": word,
+                        "part_of_speech": part_of_speech,
+                        "definition": def_text,
+                        "example": example_text,
+                        "source": "Wordnik"
+                    }
+        except Exception as e:
+            logging.warning("Error fetching Word of the Day from Wordnik: %s", e)
+
+    # Fallback to 100 curated words with deterministic day-of-year index
+    if FALLBACK_WORDS:
+        day_of_year = datetime.now(timezone.utc).timetuple().tm_yday
+        fallback_item = FALLBACK_WORDS[day_of_year % len(FALLBACK_WORDS)]
+        return {
+            "word": fallback_item.get("word", ""),
+            "part_of_speech": fallback_item.get("part_of_speech", ""),
+            "definition": fallback_item.get("definition", ""),
+            "example": fallback_item.get("example", ""),
+            "source": ""
+        }
+
+    return {
+        "word": "serendipity",
+        "part_of_speech": "noun",
+        "definition": "The occurrence and development of events by chance in a happy or beneficial way.",
+        "example": "Finding that rare book in a small thrift shop was pure serendipity.",
+        "source": ""
+    }
+
+
 def fetch_weather(config, client_ref):
     """Fetch current weather for configured location using Open-Meteo (free, no key required) and generate AI description."""
     weather_config = config.get("weather", {})
@@ -256,206 +316,6 @@ def fetch_weather(config, client_ref):
             "description": f"🌡️ {location} weather unavailable"
         }
 
-
-def fetch_word_of_day(config, client_ref):
-    """Generate Word of the Day using Gemini AI, with Free Dictionary API fallback."""
-    ai_config = config.get("ai", {})
-    
-    # Add randomness to the prompt to vary LLM outputs
-    random_seeds = [
-        "Pick an interesting, sophisticated English word suitable for a daily newspaper \"Word of the Day\" feature. Avoid extremely obscure jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.",
-        "Select a unique, elegant English word that would work well as a newspaper's Word of the Day. Steer clear of overly technical terms. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.",
-        "Choose a sophisticated yet accessible English word for a daily newspaper feature. Avoid highly specialized jargon. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word.",
-        "Generate an interesting, refined English word perfect for a newspaper Word of the Day. Don't pick extremely obscure words. Return ONLY a JSON object with these exact fields: {\"word\": \"...\", \"part_of_speech\": \"...\", \"definition\": \"...\", \"example\": \"...\"} where example is a short illustrative sentence using the word."
-    ]
-    
-    base_prompt = get_config_value(ai_config, "prompts.word_of_day", random_seeds[0])
-    
-    # If using default prompt, add randomness by selecting a variation
-    if base_prompt == random_seeds[0]:
-        word_prompt = random.choice(random_seeds)
-    else:
-        # Add a random suffix to custom prompts to vary outputs
-        random_suffixes = [
-            " Be creative and unpredictable in your choice.",
-            " Pick something different from common words.",
-            " Select a word with interesting etymology or usage.",
-            " Choose a word that's thought-provoking."
-        ]
-        word_prompt = base_prompt + random.choice(random_suffixes)
-
-    # Try Gemini AI first with primary then secondary model
-    if client_ref[0]:
-        for model_name in [get_model_for_task(config, "word_of_day", prefer_primary=True), 
-                           get_model_for_task(config, "word_of_day", prefer_primary=False)]:
-            try:
-                time.sleep(1)
-                response = client_ref[0].models.generate_content(
-                    model=model_name,
-                    contents=word_prompt
-                )
-                # Track rate limits from response
-                rate_limit_tracker.update_from_response(model_name, response)
-                match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
-                if match:
-                    parsed = json.loads(match.group(0))
-                    if all(k in parsed for k in ("word", "part_of_speech", "definition", "example")):
-                        logging.info("Word of the day from AI using %s: %s", model_name, parsed["word"])
-                        return parsed
-            except Exception as e:
-                if _handle_ai_error(e, f"word-of-day ({model_name})", client_ref):
-                    break  # AI disabled, don't try secondary
-                logging.warning("Primary model %s failed, trying secondary...", model_name)
-                continue
-
-    # Fallback: pick word from curated list using day-of-year for consistency
-    day_of_year = datetime.now().timetuple().tm_yday
-    word = FALLBACK_WORDS[day_of_year % len(FALLBACK_WORDS)]
-    try:
-        with safe_urlopen(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=10) as resp:
-            entries = json.loads(resp.read().decode())
-            if entries and isinstance(entries, list):
-                entry = entries[0]
-                meanings = entry.get("meanings", [])
-                if meanings:
-                    m = meanings[0]
-                    defs = m.get("definitions", [])
-                    definition = defs[0].get("definition", "") if defs else ""
-                    example = defs[0].get("example", "") if defs else ""
-                    return {
-                        "word": word,
-                        "part_of_speech": m.get("partOfSpeech", ""),
-                        "definition": definition,
-                        "example": example
-                    }
-    except Exception as e:
-        logging.warning("Dictionary API fallback failed for '%s': %s", word, e)
-
-    return {"word": word, "part_of_speech": "", "definition": "", "example": ""}
-
-
-PUZZLE_HISTORY_FILE = "puzzle_history.json"
-PUZZLE_HISTORY_LIMIT = 60  # Keep track of the last 60 puzzles (~2 months)
-
-
-def _load_puzzle_history():
-    """Load the list of recently used puzzle questions from disk."""
-    if os.path.exists(PUZZLE_HISTORY_FILE):
-        try:
-            with open(PUZZLE_HISTORY_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    return data
-        except Exception as e:
-            logging.warning("Could not load puzzle history: %s", e)
-    return []
-
-
-def _save_puzzle_history(history):
-    """Persist the puzzle history list to disk, trimming to the last PUZZLE_HISTORY_LIMIT entries."""
-    try:
-        trimmed = history[-PUZZLE_HISTORY_LIMIT:]
-        with open(PUZZLE_HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(trimmed, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        logging.warning("Could not save puzzle history: %s", e)
-
-
-def _is_puzzle_duplicate(question, history, threshold=0.7):
-    """Return True if the question is too similar to any entry in the history."""
-    norm_q = re.sub(r'[^\w\s]', '', question.lower())
-    for past_q in history:
-        norm_past = re.sub(r'[^\w\s]', '', past_q.lower())
-        ratio = difflib.SequenceMatcher(None, norm_q, norm_past).ratio()
-        if ratio >= threshold:
-            return True
-    return False
-
-
-def fetch_daily_puzzle(config, client_ref):
-    """Generate a unique daily puzzle (riddle or trivia) using Gemini AI, with a fallback.
-    
-    Maintains a history of recently used puzzle questions to avoid repetition.
-    """
-    ai_config = config.get("ai", {})
-    history = _load_puzzle_history()
-
-    # Build the "do not repeat" context for the AI prompt
-    avoid_clause = ""
-    if history:
-        # Only include the most recent 30 in the prompt to keep it concise
-        recent = history[-30:]
-        avoid_list = "\n".join(f"- {q}" for q in recent)
-        avoid_clause = (
-            f"\n\nIMPORTANT: Do NOT generate any of the following puzzles that were recently used. "
-            f"Create something completely different:\n{avoid_list}"
-        )
-
-    # Add randomness to the prompt to vary LLM outputs
-    random_seeds = [
-        "Generate a fun, clever daily puzzle for a newspaper. It should be a riddle or lateral-thinking question that is not too easy and not too hard. Return ONLY a JSON object with exactly these fields: {{\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}} Keep the question under 30 words, and the answer under 6 words.",
-        "Create an engaging daily puzzle for a newspaper - a riddle or brain teaser that's moderately challenging. Return ONLY a JSON object with exactly these fields: {{\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}} Keep the question under 30 words, and the answer under 6 words.",
-        "Design a clever daily newspaper puzzle - a riddle or lateral thinking problem with medium difficulty. Return ONLY a JSON object with exactly these fields: {{\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}} Keep the question under 30 words, and the answer under 6 words.",
-        "Come up with an entertaining daily puzzle for newspaper readers. Make it a riddle that's neither too simple nor too complex. Return ONLY a JSON object with exactly these fields: {{\"type\": \"riddle\", \"question\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}} Keep the question under 30 words, and the answer under 6 words."
-    ]
-
-    base_prompt = get_config_value(ai_config, "prompts.daily_puzzle", random_seeds[0])
-
-    # If using default prompt, add randomness by selecting a variation
-    if base_prompt == random_seeds[0]:
-        puzzle_prompt = random.choice(random_seeds) + avoid_clause
-    else:
-        # Add a random suffix to custom prompts to vary outputs
-        random_suffixes = [
-            " Make it unique and creative.",
-            " Try something different from classic riddles.",
-            " Focus on wordplay or lateral thinking.",
-            " Create something that makes readers think."
-        ]
-        puzzle_prompt = base_prompt + random.choice(random_suffixes) + avoid_clause
-
-    if client_ref[0]:
-        for model_name in [get_model_for_task(config, "daily_puzzle", prefer_primary=True),
-                           get_model_for_task(config, "daily_puzzle", prefer_primary=False)]:
-            try:
-                time.sleep(1)
-                response = client_ref[0].models.generate_content(
-                    model=model_name,
-                    contents=puzzle_prompt
-                )
-                # Track rate limits from response
-                rate_limit_tracker.update_from_response(model_name, response)
-                match = re.search(r'\{[^{}]+\}', response.text, re.DOTALL)
-                if match:
-                    parsed = json.loads(match.group(0))
-                    if all(k in parsed for k in ("type", "question", "answer", "hint")):
-                        question = parsed["question"]
-                        if _is_puzzle_duplicate(question, history):
-                            logging.warning("AI returned a duplicate puzzle; retrying or falling back.")
-                        else:
-                            logging.info("Daily puzzle from AI using %s: %s", model_name, question[:40])
-                            history.append(question)
-                            _save_puzzle_history(history)
-                            return parsed
-            except Exception as e:
-                if _handle_ai_error(e, f"puzzle generation ({model_name})", client_ref):
-                    break  # AI disabled, don't try secondary
-                logging.warning("Primary model %s failed, trying secondary...", model_name)
-                continue
-
-    # Fallback: pick from curated list, skipping recently used ones
-    used_questions = set(history)
-    day_of_year = datetime.now().timetuple().tm_yday
-    # Start from the day-of-year offset and walk until we find an unused puzzle
-    for offset in range(len(FALLBACK_PUZZLES)):
-        candidate = FALLBACK_PUZZLES[(day_of_year + offset) % len(FALLBACK_PUZZLES)]
-        if not _is_puzzle_duplicate(candidate["question"], list(used_questions)):
-            history.append(candidate["question"])
-            _save_puzzle_history(history)
-            return candidate
-
-    # All fallbacks exhausted (very unlikely) — just return day-of-year entry
-    return FALLBACK_PUZZLES[day_of_year % len(FALLBACK_PUZZLES)]
 
 
 
@@ -870,9 +730,8 @@ def build_newspaper():
     output_content = {
         "generated_at": datetime.now().strftime("%B %d, %Y %I:%M %p"),
         "quote": fetch_quote_of_day(),
+        "word_of_day": fetch_word_of_the_day(config),
         "weather": fetch_weather(config, client_ref),
-        "word_of_the_day": fetch_word_of_day(config, client_ref),
-        "puzzle": fetch_daily_puzzle(config, client_ref),
         "categories": {},
         "market": {},
         "hacker_news": []
