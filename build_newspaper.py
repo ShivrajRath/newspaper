@@ -608,7 +608,7 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
 
 def fetch_riddle():
     """Fetch a random riddle from the Riddles API."""
-    categories = ['funny', 'math', 'logic', 'mystery', 'science']
+    categories = ['funny', 'science', 'logic']
     random_category = random.choice(categories)
     
     try:
