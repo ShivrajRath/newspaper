@@ -595,6 +595,82 @@
             margin-top: 12px;
         }
 
+        /* ── Riddle Card ───────────────────────────────────── */
+        .riddle-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        .riddle-question {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--accent-color);
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+
+        .riddle-card[hidden] {
+            display: none;
+        }
+
+        .riddle-answer-container {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .riddle-answer {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.95rem;
+            color: var(--text-color);
+            line-height: 1.6;
+            display: none;
+        }
+
+        .riddle-answer.visible {
+            display: block;
+        }
+
+        .show-answer-btn {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 8px 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--accent-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .show-answer-btn:hover {
+            background: var(--accent-color);
+            color: var(--card-bg);
+        }
+
+        /* Print-specific upside-down mirror effect for answer */
+        @media print {
+            .riddle-answer {
+                display: block !important;
+                transform: rotate(180deg) scaleX(-1);
+                margin: 12px 0;
+                padding: 8px;
+                background: #f5f5f5;
+                border: 1px solid #ccc;
+            }
+
+            .show-answer-btn {
+                display: none !important;
+            }
+
+            .riddle-answer-container {
+                border-top: none;
+            }
+        }
+
 
     </style>
 </head>
@@ -767,6 +843,21 @@
                     `;
                 }
 
+                // Riddle Card
+                const riddle = data.riddle;
+                if (riddle && riddle.question) {
+                    extrasHTML += `
+                        <div class="card riddle-card" id="riddle-card">
+                            <h2>🧩 Daily Riddle</h2>
+                            <div class="riddle-question" id="riddle-question">${riddle.question}</div>
+                            <div class="riddle-answer-container">
+                                <button class="show-answer-btn no-print" onclick="toggleRiddleAnswer()">Show Answer</button>
+                                <div class="riddle-answer" id="riddle-answer">${riddle.answer}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 document.getElementById('content-grid').innerHTML = gridHTML + extrasHTML;
 
             } catch (err) {
@@ -821,6 +912,21 @@
             }
             document.documentElement.setAttribute('data-theme', theme);
             updateThemeIcon(theme);
+        }
+
+        function toggleRiddleAnswer() {
+            const answer = document.getElementById('riddle-answer');
+            const btn = document.querySelector('.show-answer-btn');
+            
+            if (!answer || !btn) return;
+            
+            if (answer.classList.contains('visible')) {
+                answer.classList.remove('visible');
+                btn.textContent = 'Show Answer';
+            } else {
+                answer.classList.add('visible');
+                btn.textContent = 'Hide Answer';
+            }
         }
 
         loadTheme();

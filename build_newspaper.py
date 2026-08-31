@@ -606,6 +606,38 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
     return _local_group_articles_by_section(all_articles, max_per_section, config)
 
 
+def fetch_riddle():
+    """Fetch a random riddle from the Riddles API."""
+    categories = ['funny', 'math', 'logic', 'mystery', 'science']
+    random_category = random.choice(categories)
+    
+    try:
+        url = f"https://riddles-api-eight.vercel.app/{random_category}"
+        with safe_urlopen(url, timeout=15) as req:
+            data = json.loads(req.read().decode())
+            
+            if data and data.get("riddle") and data.get("answer"):
+                logging.info("Successfully fetched riddle from category: %s", random_category)
+                return {
+                    "question": data.get("riddle"),
+                    "answer": data.get("answer"),
+                    "category": random_category
+                }
+    except Exception as e:
+        logging.warning("Error fetching riddle: %s", e)
+
+    # Fallback riddles if API fails
+    fallback_riddles = [
+        {"question": "What has keys but can't open locks?", "answer": "A piano", "category": "fallback"},
+        {"question": "What can travel around the world while staying in a corner?", "answer": "A stamp", "category": "fallback"},
+        {"question": "What gets wetter the more it dries?", "answer": "A towel", "category": "fallback"},
+        {"question": "What can you catch but not throw?", "answer": "A cold", "category": "fallback"},
+        {"question": "What has hands but can't clap?", "answer": "A clock", "category": "fallback"}
+    ]
+    
+    return random.choice(fallback_riddles)
+
+
 def fetch_hacker_news(hn_config):
     """Fetch Hacker News top stories using configuration settings."""
     if not hn_config.get("enabled", True):
@@ -732,6 +764,7 @@ def build_newspaper():
         "quote": fetch_quote_of_day(),
         "word_of_day": fetch_word_of_the_day(config),
         "weather": fetch_weather(config, client_ref),
+        "riddle": fetch_riddle(),
         "categories": {},
         "market": {},
         "hacker_news": []
