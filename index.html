@@ -651,6 +651,47 @@
             color: var(--card-bg);
         }
 
+        /* ── Joke Card ───────────────────────────────────── */
+        .joke-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        .joke-setup {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--accent-color);
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .joke-content {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--accent-color);
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+
+        .joke-delivery {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.95rem;
+            color: var(--text-color);
+            line-height: 1.6;
+            font-style: italic;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(220, 214, 197, 0.15);
+            border-radius: 6px;
+            border-left: 3px solid var(--border-color);
+        }
+
+        .joke-card[hidden] {
+            display: none;
+        }
+
         /* Print-specific upside-down mirror effect for answer */
         @media print {
             .riddle-answer {
@@ -856,6 +897,27 @@
                             </div>
                         </div>
                     `;
+                }
+
+                // Joke Card
+                const joke = data.joke;
+                if (joke) {
+                    if (joke.type === 'single' && joke.content) {
+                        extrasHTML += `
+                            <div class="card joke-card" id="joke-card">
+                                <h2>😄 Kids' Joke of the Day</h2>
+                                <div class="joke-content">${joke.content}</div>
+                            </div>
+                        `;
+                    } else if (joke.type === 'twopart' && joke.setup && joke.delivery) {
+                        extrasHTML += `
+                            <div class="card joke-card" id="joke-card">
+                                <h2>😄 Kids' Joke of the Day</h2>
+                                <div class="joke-setup">${joke.setup}</div>
+                                <div class="joke-delivery">${joke.delivery}</div>
+                            </div>
+                        `;
+                    }
                 }
 
                 document.getElementById('content-grid').innerHTML = gridHTML + extrasHTML;

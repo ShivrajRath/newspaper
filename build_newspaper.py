@@ -638,6 +638,45 @@ def fetch_riddle():
     return random.choice(fallback_riddles)
 
 
+def fetch_joke():
+    """Fetch a safe kid-friendly pun joke from JokeAPI."""
+    try:
+        url = "https://v2.jokeapi.dev/joke/pun?safe-mode"
+        with safe_urlopen(url, timeout=15) as req:
+            data = json.loads(req.read().decode())
+            
+            if data and data.get("type") == "single":
+                logging.info("Successfully fetched single-part joke")
+                return {
+                    "type": "single",
+                    "content": data.get("joke", ""),
+                    "category": data.get("category", "pun")
+                }
+            elif data and data.get("type") == "twopart":
+                logging.info("Successfully fetched two-part joke")
+                return {
+                    "type": "twopart",
+                    "setup": data.get("setup", ""),
+                    "delivery": data.get("delivery", ""),
+                    "category": data.get("category", "pun")
+                }
+    except Exception as e:
+        logging.warning("Error fetching joke: %s", e)
+
+    # Fallback kid-safe pun jokes if API fails
+    fallback_jokes = [
+        {"type": "single", "content": "Why don't scientists trust atoms? Because they make up everything!", "category": "fallback"},
+        {"type": "single", "content": "What do you call a fake noodle? An impasta!", "category": "fallback"},
+        {"type": "single", "content": "Why did the scarecrow win an award? Because he was outstanding in his field!", "category": "fallback"},
+        {"type": "twopart", "setup": "What do you call a bear with no teeth?", "delivery": "A gummy bear!", "category": "fallback"},
+        {"type": "twopart", "setup": "Why don't eggs tell jokes?", "delivery": "They'd crack each other up!", "category": "fallback"},
+        {"type": "single", "content": "What do you call a dinosaur that crashes their car? Tyrannosaurus Wrecks!", "category": "fallback"},
+        {"type": "twopart", "setup": "What do you call a fish without eyes?", "delivery": "A fsh!", "category": "fallback"}
+    ]
+    
+    return random.choice(fallback_jokes)
+
+
 def fetch_hacker_news(hn_config):
     """Fetch Hacker News top stories using configuration settings."""
     if not hn_config.get("enabled", True):
@@ -765,6 +804,7 @@ def build_newspaper():
         "word_of_day": fetch_word_of_the_day(config),
         "weather": fetch_weather(config, client_ref),
         "riddle": fetch_riddle(),
+        "joke": fetch_joke(),
         "categories": {},
         "market": {},
         "hacker_news": []
