@@ -430,9 +430,15 @@
 
             /* Use 2-column layout for better space utilization on A4 */
             .grid {
-                column-count: 2;
-                column-gap: 8mm;
-                column-fill: balance;
+                column-count: 2 !important;
+                column-gap: 8mm !important;
+                column-fill: balance !important;
+                -webkit-column-count: 2 !important;
+                -webkit-column-gap: 8mm !important;
+                -webkit-column-fill: balance !important;
+                -moz-column-count: 2 !important;
+                -moz-column-gap: 8mm !important;
+                -moz-column-fill: balance !important;
             }
 
             /* Reduce spacing inside lists and article items */
@@ -515,6 +521,83 @@
             .edition-badge {
                 font-size: 0.65rem;
                 padding: 4px 8px;
+            }
+
+            /* Riddle print styles - show answer on print */
+            .riddle-answer {
+                display: block !important;
+                transform: rotate(180deg) scaleX(-1);
+                margin: 12px 0;
+                padding: 8px;
+                background: #f5f5f5;
+                border: 1px solid #ccc;
+                -webkit-transform: rotate(180deg) scaleX(-1);
+                -moz-transform: rotate(180deg) scaleX(-1);
+            }
+
+            .show-answer-btn {
+                display: none !important;
+            }
+
+            .riddle-answer-container {
+                border-top: none;
+            }
+
+            /* Ensure joke cards are visible in print */
+            .joke-card {
+                display: block !important;
+            }
+
+            .joke-card[hidden] {
+                display: block !important;
+            }
+
+            /* Ensure all cards with hidden attribute are visible in print */
+            [hidden] {
+                display: block !important;
+            }
+
+            /* Improve column break behavior for mobile */
+            .card {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                -webkit-column-break-inside: avoid !important;
+            }
+
+            /* Ensure content doesn't get cut off between columns */
+            .article-item {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                -webkit-column-break-inside: avoid !important;
+            }
+
+            /* Force background colors for better readability (mobile print often disables backgrounds) */
+            @media print and (color) {
+                * {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+            }
+
+            /* Ensure proper spacing on mobile print */
+            .card {
+                orphans: 3;
+                widows: 3;
+            }
+
+            /* Optimize font sizes for mobile readability */
+            @media print and (max-width: 480px) {
+                body {
+                    font-size: 10pt !important;
+                }
+
+                .card h2 {
+                    font-size: 1rem !important;
+                }
+
+                .article-links p {
+                    font-size: 0.9rem !important;
+                }
             }
         }
 
@@ -692,25 +775,7 @@
             display: none;
         }
 
-        /* Print-specific upside-down mirror effect for answer */
-        @media print {
-            .riddle-answer {
-                display: block !important;
-                transform: rotate(180deg) scaleX(-1);
-                margin: 12px 0;
-                padding: 8px;
-                background: #f5f5f5;
-                border: 1px solid #ccc;
-            }
 
-            .show-answer-btn {
-                display: none !important;
-            }
-
-            .riddle-answer-container {
-                border-top: none;
-            }
-        }
 
 
     </style>
