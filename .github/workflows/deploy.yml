@@ -3,8 +3,8 @@ name: Generate & Deploy Newspaper
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 8 * * *" # Runs at 2:17 AM CST (UTC-6) / 3:17 AM CDT (UTC-5) — closest year-round approximation (morning run)
-    - cron: "25 23 * * *" # Runs at 5:25 PM CST (UTC-6) / 6:25 PM CDT (UTC-5) — closest year-round approximation (evening run)
+    - cron: "0 6 * * *" # Runs at 12:00 AM CST (UTC-6) / 11:00 PM CDT (UTC-5) — closest year-round approximation (midnight run)
+    - cron: "0 20 * * *" # Runs at 2:00 PM CST (UTC-6) / 1:00 PM CDT (UTC-5) — closest year-round approximation (afternoon run)
 
 permissions:
   contents: write
