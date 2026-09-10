@@ -167,55 +167,32 @@ def fetch_quote_of_day():
 
 
 def fetch_word_of_the_day(config=None):
-    """Fetch Word of the Day from Wordnik API, falling back to 100 curated fallback words."""
+    """Fetch Word of the Day from local word-of-the-day.json file."""
     if config:
         wod_config = config.get("word_of_day", {})
         if not wod_config.get("enabled", True):
             return None
 
-    api_key = os.environ.get("WORDNIK_API_KEY") or WORDNIK_API_KEY
-    if api_key:
-        try:
-            url = f"https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key={api_key}"
-            with safe_urlopen(url, timeout=15) as resp:
-                data = json.loads(resp.read().decode())
-                word = clean_html(data.get("word", "")).strip()
-                definitions = data.get("definitions") or []
-                def_text = ""
-                part_of_speech = ""
-                if definitions and isinstance(definitions, list):
-                    def_text = clean_html(definitions[0].get("text", "")).strip()
-                    part_of_speech = clean_html(definitions[0].get("partOfSpeech", "")).strip()
-                
-                examples = data.get("examples") or []
-                example_text = ""
-                if examples and isinstance(examples, list):
-                    example_text = clean_html(examples[0].get("text", "")).strip()
+    # Load words from local JSON file
+    try:
+        with open("word-of-the-day.json", "r", encoding="utf-8") as f:
+            words = json.load(f)
+        
+        if words and isinstance(words, list):
+            # Select a random word from the list
+            selected_word = random.choice(words)
+            logging.info("Successfully selected random word from local list: %s", selected_word.get("word", ""))
+            return {
+                "word": selected_word.get("word", ""),
+                "part_of_speech": "",
+                "definition": selected_word.get("common_thought", ""),
+                "example": selected_word.get("practice_sentence", ""),
+                "source": "Local"
+            }
+    except Exception as e:
+        logging.warning("Error loading word-of-the-day.json: %s", e)
 
-                if word and def_text:
-                    logging.info("Successfully fetched Word of the Day from Wordnik: %s", word)
-                    return {
-                        "word": word,
-                        "part_of_speech": part_of_speech,
-                        "definition": def_text,
-                        "example": example_text,
-                        "source": "Wordnik"
-                    }
-        except Exception as e:
-            logging.warning("Error fetching Word of the Day from Wordnik: %s", e)
-
-    # Fallback to 100 curated words with deterministic day-of-year index
-    if FALLBACK_WORDS:
-        day_of_year = datetime.now(timezone.utc).timetuple().tm_yday
-        fallback_item = FALLBACK_WORDS[day_of_year % len(FALLBACK_WORDS)]
-        return {
-            "word": fallback_item.get("word", ""),
-            "part_of_speech": fallback_item.get("part_of_speech", ""),
-            "definition": fallback_item.get("definition", ""),
-            "example": fallback_item.get("example", ""),
-            "source": ""
-        }
-
+    # Ultimate fallback if file loading fails
     return {
         "word": "serendipity",
         "part_of_speech": "noun",

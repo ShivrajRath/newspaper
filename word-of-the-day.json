@@ -1,0 +1,602 @@
+[
+  {
+    "word": "Lucid",
+    "common_thought": "Very clear and easy to understand",
+    "practice_sentence": "Her explanation of the complex system architecture was remarkably lucid."
+  },
+  {
+    "word": "Articulate",
+    "common_thought": "Able to express ideas clearly and effectively",
+    "practice_sentence": "He was articulate enough to explain technical debt to non-technical stakeholders."
+  },
+  {
+    "word": "Cogent",
+    "common_thought": "Clear, logical, and convincing",
+    "practice_sentence": "The team presented a cogent argument for shifting to microservices."
+  },
+  {
+    "word": "Succinct",
+    "common_thought": "Briefly and clearly expressed",
+    "practice_sentence": "Please keep your weekly project updates succinct and focused on key milestones."
+  },
+  {
+    "word": "Pithy",
+    "common_thought": "Short, concise, and full of meaning",
+    "practice_sentence": "His summary contained a pithy phrase that captured the core problem perfectly."
+  },
+  {
+    "word": "Equivocal",
+    "common_thought": "Ambiguous, uncertain, or open to multiple interpretations",
+    "practice_sentence": "The manager gave an equivocal answer when asked about upcoming team restructuring."
+  },
+  {
+    "word": "Ambiguous",
+    "common_thought": "Open to more than one interpretation; unclear",
+    "practice_sentence": "The contract language was ambiguous, leading to disagreements later."
+  },
+  {
+    "word": "Nuanced",
+    "common_thought": "Possessing subtle distinctions and complexities",
+    "practice_sentence": "The report offered a nuanced analysis rather than oversimplifying the market trends."
+  },
+  {
+    "word": "Elucidate",
+    "common_thought": "To make something clear; to explain",
+    "practice_sentence": "Could you elucidate the reasoning behind changing the database schema?"
+  },
+  {
+    "word": "Concisely",
+    "common_thought": "Expressed in few words without unnecessary details",
+    "practice_sentence": "She concisely summarized the hour-long meeting in three bullet points."
+  },
+  {
+    "word": "Explicit",
+    "common_thought": "Stated clearly and in detail, leaving no room for confusion",
+    "practice_sentence": "The guidelines gave explicit instructions on how to submit code reviews."
+  },
+  {
+    "word": "Implicit",
+    "common_thought": "Implied though not plainly expressed",
+    "practice_sentence": "There was an implicit agreement that Friday afternoons were reserved for deep work."
+  },
+  {
+    "word": "Coherent",
+    "common_thought": "Logical, consistent, and well-organized",
+    "practice_sentence": "The proposal needs a more coherent strategy before we present it to executives."
+  },
+  {
+    "word": "Incisive",
+    "common_thought": "Intelligently analytical and clear-thinking; sharp",
+    "practice_sentence": "Her incisive questions during the presentation highlighted the project's hidden risks."
+  },
+  {
+    "word": "Persuasive",
+    "common_thought": "Good at convincing someone to believe or do something",
+    "practice_sentence": "He made a persuasive case for upgrading our server infrastructure."
+  },
+  {
+    "word": "Plausible",
+    "common_thought": "Seeming reasonable or probable",
+    "practice_sentence": "That explanation sounds plausible, but we should verify the system logs first."
+  },
+  {
+    "word": "Tenable",
+    "common_thought": "Able to be maintained or defended against attack or objection",
+    "practice_sentence": "Holding onto legacy software without security updates is no longer a tenable position."
+  },
+  {
+    "word": "Untenable",
+    "common_thought": "Not able to be maintained, defended, or supported",
+    "practice_sentence": "Maintaining three separate databases for the same user data became untenable."
+  },
+  {
+    "word": "Unambiguous",
+    "common_thought": "Not open to more than one interpretation; completely clear",
+    "practice_sentence": "The telemetry metrics provided unambiguous evidence of performance improvement."
+  },
+  {
+    "word": "Pragmatic",
+    "common_thought": "Dealing with things sensibly and realistically; practical",
+    "practice_sentence": "We took a pragmatic approach and launched a minimum viable product first."
+  },
+  {
+    "word": "Amiable",
+    "common_thought": "Friendly, pleasant, and easy to like",
+    "practice_sentence": "He was an amiable colleague who always welcomed questions from junior developers."
+  },
+  {
+    "word": "Acerbic",
+    "common_thought": "Sharp, biting, or critical in tone or expression",
+    "practice_sentence": "His acerbic comments during code review discouraged people from asking for help."
+  },
+  {
+    "word": "Intransigent",
+    "common_thought": "Unwilling or refusing to change one's views or agree",
+    "practice_sentence": "The client remained intransigent about the deadline despite scope changes."
+  },
+  {
+    "word": "Fastidious",
+    "common_thought": "Very attentive to detail and accuracy; painstaking",
+    "practice_sentence": "Her fastidious attention to code quality prevented many subtle bugs."
+  },
+  {
+    "word": "Meticulous",
+    "common_thought": "Showing great attention to detail; careful and precise",
+    "practice_sentence": "He kept meticulous notes during every architectural design session."
+  },
+  {
+    "word": "Diligent",
+    "common_thought": "Having or showing care and conscientiousness in work",
+    "practice_sentence": "Through diligent testing, the QA team caught the edge-case error before release."
+  },
+  {
+    "word": "Prudent",
+    "common_thought": "Acting with or showing care and thought for the future",
+    "practice_sentence": "It would be prudent to back up all databases before running the migration script."
+  },
+  {
+    "word": "Resilient",
+    "common_thought": "Able to withstand or recover quickly from difficult conditions",
+    "practice_sentence": "Our infrastructure is resilient enough to handle sudden spikes in web traffic."
+  },
+  {
+    "word": "Tenacious",
+    "common_thought": "Persistent, determined, and holding firm",
+    "practice_sentence": "Her tenacious effort solved a memory leak bug that had puzzled the team for weeks."
+  },
+  {
+    "word": "Complacent",
+    "common_thought": "Self-satisfied and uncritical of oneself or one's achievements",
+    "practice_sentence": "We cannot afford to be complacent just because our quarterly user growth is high."
+  },
+  {
+    "word": "Magnanimous",
+    "common_thought": "Generous or forgiving, especially toward a rival or less powerful person",
+    "practice_sentence": "He was magnanimous in defeat, complimenting his opponent's innovative design."
+  },
+  {
+    "word": "Gregarious",
+    "common_thought": "Fond of company; sociable and outgoing",
+    "practice_sentence": "Her gregarious personality made her an effective developer advocate and speaker."
+  },
+  {
+    "word": "Reticent",
+    "common_thought": "Not revealing one's thoughts or feelings readily; reserved",
+    "practice_sentence": "He was reticent to speak up during meetings until he had gathered full data."
+  },
+  {
+    "word": "Pragmatist",
+    "common_thought": "A person who is guided by practical considerations rather than ideals",
+    "practice_sentence": "As a pragmatist, she preferred functional solutions over theoretical perfection."
+  },
+  {
+    "word": "Discreet",
+    "common_thought": "Careful and circumspect in conduct or speech; maintaining privacy",
+    "practice_sentence": "Please be discreet when handling confidential customer telemetry data."
+  },
+  {
+    "word": "Judicious",
+    "common_thought": "Having, showing, or done with good judgment or sense",
+    "practice_sentence": "A judicious use of caching significantly improved our application response times."
+  },
+  {
+    "word": "Candid",
+    "common_thought": "Truthful, straightforward, and frank",
+    "practice_sentence": "I appreciate your candid feedback on the prototype design."
+  },
+  {
+    "word": "Erudite",
+    "common_thought": "Having or showing great knowledge or learning",
+    "practice_sentence": "The professor delivered an erudite lecture on distributed system consensus algorithms."
+  },
+  {
+    "word": "Indefatigable",
+    "common_thought": "Persisting tirelessly without giving up",
+    "practice_sentence": "Her indefatigable work ethic was instrumental in launching the project on schedule."
+  },
+  {
+    "word": "Circumspect",
+    "common_thought": "Wary and unwilling to take risks; cautious",
+    "practice_sentence": "Engineers should be circumspect when modifying legacy code without unit tests."
+  },
+  {
+    "word": "Ephemeral",
+    "common_thought": "Lasting for a very short time; temporary",
+    "practice_sentence": "Social media trends are often ephemeral, disappearing within a few days."
+  },
+  {
+    "word": "Ubiquitous",
+    "common_thought": "Present, appearing, or found everywhere",
+    "practice_sentence": "Mobile applications have become ubiquitous in daily modern life."
+  },
+  {
+    "word": "Transitory",
+    "common_thought": "Not permanent; brief or temporary",
+    "practice_sentence": "The initial drop in site traffic was transitory and rebounded within a week."
+  },
+  {
+    "word": "Transient",
+    "common_thought": "Lasting only for a short time; impermanent",
+    "practice_sentence": "We encountered a transient network error that resolved itself automatically."
+  },
+  {
+    "word": "Perpetual",
+    "common_thought": "Never ending or changing; occurring repeatedly",
+    "practice_sentence": "The project suffered from a perpetual cycle of changing requirements."
+  },
+  {
+    "word": "Incessant",
+    "common_thought": "Continuing without pause or interruption",
+    "practice_sentence": "The incessant notifications made it difficult to maintain deep focus."
+  },
+  {
+    "word": "Sporadic",
+    "common_thought": "Occurring at irregular intervals or only in a few places",
+    "practice_sentence": "We noticed sporadic network timeouts during peak operating hours."
+  },
+  {
+    "word": "Intermittent",
+    "common_thought": "Occurring at irregular intervals; not continuous",
+    "practice_sentence": "An intermittent bug is often harder to reproduce and debug than a constant one."
+  },
+  {
+    "word": "Protracted",
+    "common_thought": "Lasting for a long time or longer than expected",
+    "practice_sentence": "The acquisition involved protracted negotiations over intellectual property rights."
+  },
+  {
+    "word": "Concurrent",
+    "common_thought": "Existing, happening, or done at the same time",
+    "practice_sentence": "The server handles thousands of concurrent connections simultaneously."
+  },
+  {
+    "word": "Synchronous",
+    "common_thought": "Existing or occurring at the same time",
+    "practice_sentence": "Synchronous API calls block execution until a response is received."
+  },
+  {
+    "word": "Asynchronous",
+    "common_thought": "Not existing or happening at the same time",
+    "practice_sentence": "Using an asynchronous queue prevents the user interface from freezing."
+  },
+  {
+    "word": "Evolving",
+    "common_thought": "Developing gradually, especially from a simple to a more complex form",
+    "practice_sentence": "Our security protocols are constantly evolving to counter new threats."
+  },
+  {
+    "word": "Immutable",
+    "common_thought": "Unchanging over time or unable to be changed",
+    "practice_sentence": "In functional programming, immutable data structures prevent unintended side effects."
+  },
+  {
+    "word": "Mutable",
+    "common_thought": "Liable to change or capable of being changed",
+    "practice_sentence": "In this language, string variables are mutable by default."
+  },
+  {
+    "word": "Nascent",
+    "common_thought": "Just coming into existence and beginning to display signs of future potential",
+    "practice_sentence": "The team is exploring nascent AI technology to automate routine triage."
+  },
+  {
+    "word": "Obsolete",
+    "common_thought": "No longer produced or used; out of date",
+    "practice_sentence": "This software framework is now obsolete and should be replaced in the next sprint."
+  },
+  {
+    "word": "Precipitous",
+    "common_thought": "Dangerously high or steep; sudden and dramatic",
+    "practice_sentence": "A precipitous drop in user activity signaled a critical issue in the release."
+  },
+  {
+    "word": "Sustainable",
+    "common_thought": "Able to be maintained at a certain rate or level",
+    "practice_sentence": "Working 80-hour weeks is not a sustainable long-term strategy for engineering teams."
+  },
+  {
+    "word": "Persistent",
+    "common_thought": "Continuing firmly or obstinately in a course of action",
+    "practice_sentence": "A persistent database connection ensures faster query response times."
+  },
+  {
+    "word": "Insidious",
+    "common_thought": "Proceeding in a gradual, subtle way, but with harmful effects",
+    "practice_sentence": "Memory leaks can be insidious because they slowly degrade system performance over time."
+  },
+  {
+    "word": "Deleterious",
+    "common_thought": "Causing harm or damage",
+    "practice_sentence": "Excessive context switching has a deleterious effect on developer productivity."
+  },
+  {
+    "word": "Detrimental",
+    "common_thought": "Tending to cause harm or damage",
+    "practice_sentence": "Skipping unit tests to meet deadlines proved detrimental to product stability."
+  },
+  {
+    "word": "Precarious",
+    "common_thought": "Not securely held or in position; dangerously uncertain",
+    "practice_sentence": "The startup was in a precarious financial position before securing Series A funding."
+  },
+  {
+    "word": "Vulnerable",
+    "common_thought": "Exposed to the possibility of being attacked or harmed",
+    "practice_sentence": "Unpatched software leaves servers vulnerable to automated security exploits."
+  },
+  {
+    "word": "Pervasive",
+    "common_thought": "Spreading widely throughout an area or a group of people",
+    "practice_sentence": "Technical debt was pervasive throughout the legacy monolith codebase."
+  },
+  {
+    "word": "Systemic",
+    "common_thought": "Relating to or affecting an entire system rather than just parts",
+    "practice_sentence": "The downtime was caused by a systemic failure in our cloud platform configuration."
+  },
+  {
+    "word": "Ubiquity",
+    "common_thought": "The state of being everywhere or very common",
+    "practice_sentence": "The ubiquity of high-speed internet made cloud computing viable worldwide."
+  },
+  {
+    "word": "Latent",
+    "common_thought": "Existing but not yet developed, manifest, or active; hidden",
+    "practice_sentence": "The code contained a latent defect that only surfaced under heavy server load."
+  },
+  {
+    "word": "Manifest",
+    "common_thought": "Clear or obvious to the eye or mind; to display",
+    "practice_sentence": "The performance bottlenecks began to manifest after user traffic doubled."
+  },
+  {
+    "word": "Adverse",
+    "common_thought": "Preventing success or development; harmful or unfavorable",
+    "practice_sentence": "Unexpected network latency had an adverse effect on application performance."
+  },
+  {
+    "word": "Mitigate",
+    "common_thought": "To make less severe, serious, or painful",
+    "practice_sentence": "Implementing redundant servers helps mitigate the risk of hardware failures."
+  },
+  {
+    "word": "Exacerbate",
+    "common_thought": "To make a problem, bad situation, or negative feeling worse",
+    "practice_sentence": "Adding more features without fixing bugs will only exacerbate system complexity."
+  },
+  {
+    "word": "Alleviate",
+    "common_thought": "To make suffering or a problem less severe",
+    "practice_sentence": "Refactoring slow database queries will alleviate server load under peak usage."
+  },
+  {
+    "word": "Ameliorate",
+    "common_thought": "To make something bad or unsatisfactory better",
+    "practice_sentence": "The software patch served to ameliorate the worst of the user latency issues."
+  },
+  {
+    "word": "Compromise",
+    "common_thought": "To weaken or bring into danger",
+    "practice_sentence": "Failing to sanitize user inputs will compromise database security."
+  },
+  {
+    "word": "Robust",
+    "common_thought": "Sturdy and unlikely to break; strong and healthy",
+    "practice_sentence": "We built a robust monitoring system to detect outages instantly."
+  },
+  {
+    "word": "Fragile",
+    "common_thought": "Easily broken or damaged; delicate",
+    "practice_sentence": "The custom build script was fragile and broke with every minor library update."
+  },
+  {
+    "word": "Resilient",
+    "common_thought": "Able to withstand or recover quickly from difficult conditions",
+    "practice_sentence": "A resilient microservice architecture can tolerate individual node failures."
+  },
+  {
+    "word": "Redundant",
+    "common_thought": "Not or no longer needed or useful; duplicated for safety",
+    "practice_sentence": "We configured redundant network routes to prevent single points of failure."
+  },
+  {
+    "word": "Catalyst",
+    "common_thought": "A person or thing that precipitates or speeds up an event",
+    "practice_sentence": "The customer complaint acted as a catalyst for overdue user experience improvements."
+  },
+  {
+    "word": "Impetus",
+    "common_thought": "The force or energy that makes something happen",
+    "practice_sentence": "The regulatory deadline provided the impetus to complete our data compliance audit."
+  },
+  {
+    "word": "Correlation",
+    "common_thought": "A mutual relationship or connection between two or more things",
+    "practice_sentence": "There is a strong correlation between site page speed and user retention."
+  },
+  {
+    "word": "Concomitant",
+    "common_thought": "Naturally accompanying or associated with something",
+    "practice_sentence": "Higher server bandwidth requirements are a concomitant result of video streaming."
+  },
+  {
+    "word": "Disparity",
+    "common_thought": "A great difference or inequality",
+    "practice_sentence": "There was a noticeable disparity between projected performance and actual metrics."
+  },
+  {
+    "word": "Divergence",
+    "common_thought": "The process or state of separating or growing apart",
+    "practice_sentence": "The divergence in coding standards between teams caused integration friction."
+  },
+  {
+    "word": "Convergence",
+    "common_thought": "The process or state of coming together from different directions",
+    "practice_sentence": "The convergence of AI tools and software design is changing dev workflows."
+  },
+  {
+    "word": "Synthesis",
+    "common_thought": "The combination of ideas to form a theory or system",
+    "practice_sentence": "The new software architecture was a synthesis of microservices and event-driven design."
+  },
+  {
+    "word": "Discrepancy",
+    "common_thought": "A lack of compatibility or similarity between two or more facts",
+    "practice_sentence": "Audit logs revealed a discrepancy between reported revenues and actual transactions."
+  },
+  {
+    "word": "Analogy",
+    "common_thought": "A comparison between two things for explanation or clarification",
+    "practice_sentence": "He used the analogy of a library filing system to explain database indexes."
+  },
+  {
+    "word": "Equivalence",
+    "common_thought": "The state of being equal in value, amount, function, or meaning",
+    "practice_sentence": "There is no direct functional equivalence between these two API endpoints."
+  },
+  {
+    "word": "Prerequisite",
+    "common_thought": "A thing that is required as a prior condition for something else",
+    "practice_sentence": "Completing the introductory course is a prerequisite for advanced security training."
+  },
+  {
+    "word": "Precursor",
+    "common_thought": "A person or thing that comes before another of the same kind",
+    "practice_sentence": "Basic command-line scripting was an essential precursor to modern DevOps practices."
+  },
+  {
+    "word": "Consequence",
+    "common_thought": "A result or effect of an action or condition",
+    "practice_sentence": "Data corruption was an unforeseen consequence of the abrupt power outage."
+  },
+  {
+    "word": "Ramification",
+    "common_thought": "A consequence of an action or event, especially when complex",
+    "practice_sentence": "Engineers weighed the long-term architectural ramifications of switching frameworks."
+  },
+  {
+    "word": "Causal",
+    "common_thought": "Relating to or acting as a cause",
+    "practice_sentence": "Researchers identified a causal link between page load latency and cart abandonment."
+  },
+  {
+    "word": "Contingent",
+    "common_thought": "Dependent on space, time, or other conditions",
+    "practice_sentence": "Our deployment plan is contingent on successful completion of end-to-end tests."
+  },
+  {
+    "word": "Integral",
+    "common_thought": "Necessary to make a whole complete; essential",
+    "practice_sentence": "Automated testing is an integral part of our continuous integration pipeline."
+  },
+  {
+    "word": "Intrinsic",
+    "common_thought": "Belonging naturally; essential or inherent",
+    "practice_sentence": "Security must be an intrinsic feature of product design, not an afterthought."
+  },
+  {
+    "word": "Extrinsic",
+    "common_thought": "Not part of the essential nature of someone or something; coming from outside",
+    "practice_sentence": "Motivation driven by extrinsic rewards alone often leads to developer burnout."
+  },
+  {
+    "word": "Copious",
+    "common_thought": "Abundant in supply or quantity",
+    "practice_sentence": "He took copious notes during the technical architecture planning meeting."
+  },
+  {
+    "word": "Paucity",
+    "common_thought": "The presence of something only in small or insufficient quantities; scarcity",
+    "practice_sentence": "A paucity of documented API examples slowed down developer onboarding."
+  },
+  {
+    "word": "Plethora",
+    "common_thought": "A large or excessive amount of something",
+    "practice_sentence": "The framework offers a plethora of configuration options for custom setups."
+  },
+  {
+    "word": "Sparse",
+    "common_thought": "Thinly dispersed or scattered",
+    "practice_sentence": "System logging was too sparse to diagnose why the background worker crashed."
+  },
+  {
+    "word": "Substantial",
+    "common_thought": "Of considerable importance, size, or value",
+    "practice_sentence": "The team achieved a substantial speedup after optimizing database indexes."
+  },
+  {
+    "word": "Marginal",
+    "common_thought": "Small, minor, or barely noticeable",
+    "practice_sentence": "The code cleanup resulted in a marginal improvement in execution speed."
+  },
+  {
+    "word": "Profound",
+    "common_thought": "Very great or intense; deep",
+    "practice_sentence": "The transition to remote work had a profound impact on team collaboration tools."
+  },
+  {
+    "word": "Superficial",
+    "common_thought": "Existing or occurring at or on the surface; shallow",
+    "practice_sentence": "A superficial code review missed several critical edge-case security bugs."
+  },
+  {
+    "word": "Acute",
+    "common_thought": "Present or experienced to a severe or intense degree",
+    "practice_sentence": "The system outage caused acute disruption to our customer support operations."
+  },
+  {
+    "word": "Moderate",
+    "common_thought": "Average in amount, intensity, quality, or degree",
+    "practice_sentence": "The new feature showed a moderate increase in daily active user engagement."
+  },
+  {
+    "word": "Exorbitant",
+    "common_thought": "Unreasonably high in price or cost",
+    "practice_sentence": "The cloud hosting bill was exorbitant due to unoptimized database queries."
+  },
+  {
+    "word": "Nominal",
+    "common_thought": "Existing in name only; far below real value or cost",
+    "practice_sentence": "We paid a nominal fee for access to the public weather API."
+  },
+  {
+    "word": "Copiousness",
+    "common_thought": "Abundance or fullness in detail or quantity",
+    "practice_sentence": "The copiousness of the documentation made third-party integration straightforward."
+  },
+  {
+    "word": "Prodigious",
+    "common_thought": "Remarkably or impressively great in extent, size, or degree",
+    "practice_sentence": "The engineering team demonstrated prodigious productivity during the hackathon."
+  },
+  {
+    "word": "Meager",
+    "common_thought": "Lacking in quantity or quality; inadequate",
+    "practice_sentence": "The project was allocated a meager budget, limiting hardware purchases."
+  },
+  {
+    "word": "Incremental",
+    "common_thought": "Relating to or denoting small, gradual increases",
+    "practice_sentence": "We release incremental updates every two weeks rather than massive quarterly builds."
+  },
+  {
+    "word": "Cumulative",
+    "common_thought": "Increasing or increased by successive additions",
+    "practice_sentence": "The cumulative effect of minor optimizations reduced latency by 40%."
+  },
+  {
+    "word": "Exponential",
+    "common_thought": "Becoming more and more rapid",
+    "practice_sentence": "The platform experienced exponential growth in registered users after launch."
+  },
+  {
+    "word": "Paramount",
+    "common_thought": "More important than anything else; supreme",
+    "practice_sentence": "Maintaining user data privacy is of paramount importance to our company."
+  },
+  {
+    "word": "Negligible",
+    "common_thought": "So small or unimportant as to be not worth considering",
+    "practice_sentence": "The overhead added by the logging library is negligible in production."
+  }
+]
