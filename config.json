@@ -114,16 +114,12 @@
     {
       "name": "Science & Tech",
       "feeds": [
-        "https://www.sciencedaily.com/rss/top/science.xml",
         "https://phys.org/rss-feed/",
         "https://www.nature.com/nature.rss",
         "https://feeds.arstechnica.com/arstechnica/index",
-        "https://www.theverge.com/rss/index.xml"
+        "https://www.theverge.com/rss/index.xml",
+        "https://www.sciencedaily.com/rss/health_medicine.xml"
       ]
-    },
-    {
-      "name": "Health & Fitness",
-      "feeds": ["https://www.sciencedaily.com/rss/health_medicine.xml"]
     }
   ]
 }

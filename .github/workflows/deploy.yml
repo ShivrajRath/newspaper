@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 6 * * *" # Runs at 12:00 AM CST (UTC-6) / 11:00 PM CDT (UTC-5) — closest year-round approximation (midnight run)
-    - cron: "0 20 * * *" # Runs at 2:00 PM CST (UTC-6) / 1:00 PM CDT (UTC-5) — closest year-round approximation (afternoon run)
 
 permissions:
   contents: write
