@@ -392,45 +392,365 @@ def fetch_section_articles(feed_urls, max_per_feed, config):
     return all_articles
 
 
+_STOPWORDS = {
+    "a", "an", "the", "and", "or", "but", "if", "then", "else", "when", "while",
+    "of", "at", "by", "for", "with", "about", "into", "through", "during",
+    "before", "after", "above", "below", "up", "down", "in", "out", "on",
+    "off", "over", "under", "again", "further", "once", "here", "there",
+    "all", "any", "both", "each", "few", "more", "most", "other", "some",
+    "such", "only", "own", "same", "than", "too", "very", "can", "will",
+    "just", "don", "should", "now", "from", "as", "is", "are", "was",
+    "were", "be", "been", "being", "have", "has", "had", "having", "do",
+    "does", "did", "doing", "would", "could", "ought", "its", "it", "itself",
+    "this", "that", "these", "those", "he", "she", "they", "them", "his",
+    "her", "hers", "their", "theirs", "our", "ours", "your", "yours",
+    "who", "whom", "which", "what", "where", "why", "how", "to", "s",
+    "t", "says", "say", "said", "tells", "told", "after", "amid", "among",
+    "over", "under", "with", "without", "within", "along", "across",
+    "new", "first", "last", "one", "two", "amid", "over",
+}
+
+
+def _normalize_for_match(text):
+    """Lowercase, strip possessives, remove punctuation for comparison."""
+    if not text:
+        return ""
+    t = text.lower()
+    t = re.sub(r"['\u2019]s\b", "", t)
+    t = re.sub(r"[^\w\s]", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def _stem_token(tok):
+    """Lightweight stem for dedup: map key event words to canonical forms."""
+    if not tok:
+        return tok
+    if tok in ("dies", "died", "dying", "dead", "deaths", "death"):
+        return "die"
+    if tok in ("obituary", "obituaries", "obits"):
+        return "die"
+    if tok.startswith("execut"):
+        return "execut"
+    if tok.startswith("hurrican"):
+        return "hurrican"
+    if tok in ("storms", "stormy"):
+        return "storm"
+    if tok in ("lawyers", "lawyer"):
+        return "lawyer"
+    if tok in ("injections", "injection"):
+        return "injection"
+    # generic plural handling
+    if len(tok) > 5 and tok.endswith("ies"):
+        return tok[:-3] + "y"
+    if len(tok) > 4 and tok.endswith("es"):
+        # e.g. passes -> pass, crashes -> crash, but keep 'texas' intact
+        if tok not in ("texas", "isaias"):
+            return tok[:-2]
+    if len(tok) > 4 and tok.endswith("s") and not tok.endswith("ss"):
+        if tok not in ("texas", "isaias", "news"):
+            return tok[:-1]
+    return tok
+
+
+def _significant_tokens(text):
+    """Return (list, set) of stemmed significant tokens preserving order."""
+    norm = _normalize_for_match(text)
+    tokens = []
+    for raw in norm.split():
+        if len(raw) < 3:
+            continue
+        if raw in _STOPWORDS:
+            continue
+        stemmed = _stem_token(raw)
+        if stemmed in _STOPWORDS:
+            continue
+        if len(stemmed) < 3:
+            continue
+        tokens.append(stemmed)
+    return tokens, set(tokens)
+
+
+def _significant_bigrams(ordered_tokens):
+    """Return set of 'w1 w2' for consecutive significant tokens."""
+    if len(ordered_tokens) < 2:
+        return set()
+    return {f"{ordered_tokens[i]} {ordered_tokens[i + 1]}" for i in range(len(ordered_tokens) - 1)}
+
+
+def _event_flags(sig_set):
+    """Return set of event clusters present: death / execution / storm."""
+    flags = set()
+    if "die" in sig_set or "obit" in sig_set:
+        flags.add("death")
+    if "execut" in sig_set or "lethal" in sig_set or "injection" in sig_set:
+        flags.add("execution")
+    if "hurrican" in sig_set or "storm" in sig_set or "tropical" in sig_set or "cyclon" in sig_set or "typhoon" in sig_set:
+        flags.add("storm")
+    return flags
+
+
+def _build_doc_freq(articles):
+    """Count in how many article titles each significant token appears."""
+    from collections import Counter
+    freq = Counter()
+    for art in articles:
+        _, sig_set = _significant_tokens(art.get("title", ""))
+        for tok in sig_set:
+            freq[tok] += 1
+    return freq
+
+
+def _is_rare(tok, doc_freq, total_docs, max_df=3):
+    """A token is distinctive if short-list rare across the batch."""
+    if len(tok) < 5:
+        return False
+    if doc_freq is None or total_docs is None:
+        return len(tok) >= 6
+    return doc_freq.get(tok, 1) <= max_df
+
+
+def _summary_word_overlap(s1, s2):
+    """Word overlap ratio on summaries using significant tokens."""
+    _, set1 = _significant_tokens(s1 or "")
+    _, set2 = _significant_tokens(s2 or "")
+    if not set1 or not set2:
+        return 0.0
+    return len(set1.intersection(set2)) / max(len(set1), len(set2))
+
+
+def _are_near_duplicates(art1, art2, similarity_threshold=0.65, word_overlap_threshold=0.7,
+                         doc_freq=None, total_docs=None):
+    """Return True if two articles cover the same story.
+
+    Combines the legacy checks (sequence ratio, raw word overlap) with
+    entity-aware checks that catch same-person/same-event rewrites with
+    very different wording, e.g.:
+      - 'Margaret Hamilton, whose software helped land Apollo 11 ... dies'
+        vs 'Margaret Hamilton, scientist who worked on NASA Apollo ... dead'
+      - 'Texas carries out first US execution since Christa Pike's ...'
+        vs 'Texas executes man after lawyers sought to stop ... citing Pike'
+      - 'Isaias becomes first hurricane of 2026 ...'
+        vs 'Tropical Storm Isaias forms in Gulf ...'
+    """
+    link1 = (art1.get("link") or art1.get("url") or "").strip()
+    link2 = (art2.get("link") or art2.get("url") or "").strip()
+    if link1 and link1 == link2:
+        return True
+
+    t1 = (art1.get("title") or "").strip()
+    t2 = (art2.get("title") or "").strip()
+    if not t1 or not t2:
+        return False
+
+    n1 = _normalize_for_match(t1)
+    n2 = _normalize_for_match(t2)
+    if n1 == n2:
+        return True
+
+    # 1) legacy sequence similarity on full normalized titles, guarded
+    # against short-template false positives (e.g. 'Alpha Story' vs
+    # 'Gamma Story' ratio 0.73, or 'Story 0' vs 'Story 1' ratio 0.86).
+    # High ratio alone only counts when there is additional shared content.
+    try:
+        seq_ratio = difflib.SequenceMatcher(None, n1, n2).ratio()
+        if seq_ratio > similarity_threshold:
+            # Compute significant overlap early for the guard.
+            _l1, _s1 = _significant_tokens(t1)
+            _l2, _s2 = _significant_tokens(t2)
+            _shared_early = _s1.intersection(_s2) if _s1 and _s2 else set()
+            _raw_overlap_early = 0.0
+            _w1e = set(n1.split())
+            _w2e = set(n2.split())
+            if _w1e and _w2e:
+                _raw_overlap_early = len(_w1e.intersection(_w2e)) / max(len(_w1e), len(_w2e))
+            is_long = max(len(n1), len(n2)) > 40 or max(len(_w1e), len(_w2e)) > 5
+            if is_long or len(_shared_early) >= 2 or _raw_overlap_early > 0.5 or seq_ratio > 0.9:
+                return True
+            # else: fall through to entity-aware checks below
+    except Exception:
+        pass
+
+    # 2) legacy raw word overlap (all words, matches historic behaviour)
+    w1 = set(n1.split())
+    w2 = set(n2.split())
+    if w1 and w2:
+        if len(w1.intersection(w2)) / max(len(w1), len(w2)) > word_overlap_threshold:
+            return True
+
+    # Significant-token views (stopwords removed, stemmed)
+    list1, set1 = _significant_tokens(t1)
+    list2, set2 = _significant_tokens(t2)
+    if not set1 or not set2:
+        return False
+    shared = set1.intersection(set2)
+
+    # 3) three or more shared content words -> same story even if
+    #    wording/order differs (covers Pike x3, Hamilton x2, Isaias x2).
+    if len(shared) >= 3:
+        return True
+
+    big1 = _significant_bigrams(list1)
+    big2 = _significant_bigrams(list2)
+    shared_bigrams = big1.intersection(big2) if big1 and big2 else set()
+
+    flags1 = _event_flags(set1)
+    flags2 = _event_flags(set2)
+    shared_flags = flags1.intersection(flags2)
+
+    s1 = art1.get("summary") or art1.get("description") or ""
+    s2 = art2.get("summary") or art2.get("description") or ""
+    summ_overlap = _summary_word_overlap(s1, s2)
+
+    # Also consider title+summary tokens for entity continuity
+    _, sum_set1 = _significant_tokens(s1)
+    _, sum_set2 = _significant_tokens(s2)
+
+    # 4) shared person-name-style bigram (e.g. 'margaret hamilton',
+    #    'christa pike', 'jamaal howard') plus same event or extra overlap.
+    if shared_bigrams:
+        if shared_flags:
+            return True
+        if len(shared) >= 2:
+            return True
+        if summ_overlap > 0.25:
+            return True
+        # title entity + summary entity continuity (e.g. Pike in title,
+        # Howard in both summaries)
+        if sum_set1 and sum_set2 and len(sum_set1.intersection(sum_set2)) >= 2:
+            title_entities = set1.union(set2)
+            if len(title_entities.intersection(sum_set1.union(sum_set2))) >= 1 and len(sum_set1.intersection(sum_set2)) >= 2:
+                return True
+
+    # 5) two shared content words where at least one is rare/distinctive,
+    #    or both share the same event type (death/execution/storm).
+    if len(shared) >= 2:
+        rare_shared = [w for w in shared if _is_rare(w, doc_freq, total_docs)]
+        if rare_shared:
+            return True
+        if shared_flags:
+            return True
+        if summ_overlap > 0.3:
+            return True
+
+    # 6) single rare entity (e.g. 'isaias') + same event cluster or
+    #    strong summary overlap -> same story despite paraphrased titles.
+    if len(shared) >= 1:
+        rare_shared = [w for w in shared if _is_rare(w, doc_freq, total_docs)]
+        if rare_shared and (shared_flags or summ_overlap > 0.3):
+            return True
+        # summary carries the entity: title has 'pike', summaries share 'howard'
+        if rare_shared and sum_set1 and sum_set2:
+            if len(sum_set1.intersection(sum_set2)) >= 2:
+                return True
+
+    # 7) summaries strongly overlap and titles share an entity.
+    if summ_overlap > 0.5 and len(shared) >= 1:
+        return True
+
+    return False
+
+
+def deterministic_global_deduplicate(grouped_articles, section_order, config):
+    """Double-check pass: guarantee no near-duplicates survive across sections.
+
+    Keeps the first occurrence in `section_order` priority and drops later
+    copies, regardless of whether the AI pass missed them. Also catches
+    within-section duplicates the per-section pass may have missed.
+    """
+    limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
+    sim_threshold = limits_config.get("deduplication_similarity_threshold", 0.65)
+    overlap_threshold = limits_config.get("word_overlap_threshold", 0.7)
+
+    if not grouped_articles:
+        return {}
+
+    order = list(section_order) if section_order else list(grouped_articles.keys())
+    for sec in grouped_articles.keys():
+        if sec not in order:
+            order.append(sec)
+
+    all_kept = []
+    for sec in order:
+        all_kept.extend(grouped_articles.get(sec, []) or [])
+    doc_freq = _build_doc_freq(all_kept)
+    total = len(all_kept)
+
+    seen = []
+    result = {sec: [] for sec in order}
+    for sec in order:
+        for art in (grouped_articles.get(sec, []) or []):
+            duplicate_of = None
+            for prev_art, prev_sec in seen:
+                if _are_near_duplicates(art, prev_art, sim_threshold, overlap_threshold, doc_freq, total):
+                    duplicate_of = (prev_art, prev_sec)
+                    break
+            if duplicate_of is not None:
+                logging.info(
+                    "Deterministic dedup: dropping '%s' (%s) as duplicate of '%s' (%s)",
+                    (art.get("title") or "")[:90], sec,
+                    (duplicate_of[0].get("title") or "")[:90], duplicate_of[1],
+                )
+                continue
+            seen.append((art, sec))
+            result[sec].append(art)
+    return result
+
+
+def deduplicate_hacker_news_list(hacker_news, config):
+    """Remove internal near-duplicates within the Hacker News list."""
+    if not hacker_news:
+        return []
+    limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
+    sim_threshold = limits_config.get("deduplication_similarity_threshold", 0.65)
+    overlap_threshold = limits_config.get("word_overlap_threshold", 0.7)
+    doc_freq = _build_doc_freq([{"title": hn.get("title", "")} for hn in hacker_news])
+    total = len(hacker_news)
+    unique = []
+    for hn in hacker_news:
+        if not hn.get("title", "").strip():
+            continue
+        is_dup = any(
+            _are_near_duplicates(
+                {"title": hn.get("title", ""), "link": hn.get("url", "")},
+                {"title": kept.get("title", ""), "link": kept.get("url", "")},
+                sim_threshold, overlap_threshold, doc_freq, total,
+            )
+            for kept in unique
+        )
+        if is_dup:
+            logging.info("HN dedup: dropping duplicate HN story '%s'", (hn.get("title") or "")[:90])
+            continue
+        unique.append(hn)
+    return unique
+
+
 def local_deduplicate_articles(articles, max_items, config):
-    """Filter duplicate or near-duplicate articles using rule-based title similarity."""
+    """Filter duplicate or near-duplicate articles using title+summary similarity."""
     if not articles:
         return []
 
-    limits_config = config.get("limits", {})
+    limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
     similarity_threshold = limits_config.get("deduplication_similarity_threshold", 0.65)
     word_overlap_threshold = limits_config.get("word_overlap_threshold", 0.7)
 
+    doc_freq = _build_doc_freq(articles)
+    total = len(articles)
+
     unique_articles = []
-    seen_titles = []
 
     for art in articles:
-        title = art.get("title", "").strip()
+        title = (art.get("title") or "").strip()
         if not title:
             continue
 
-        normalized_title = re.sub(r'[^\w\s]', '', title.lower())
-        is_duplicate = False
-
-        for seen in seen_titles:
-            # Check exact or near-exact string similarity
-            ratio = difflib.SequenceMatcher(None, normalized_title, seen).ratio()
-            if ratio > similarity_threshold:
-                is_duplicate = True
-                break
-            # Check word overlap
-            words1 = set(normalized_title.split())
-            words2 = set(seen.split())
-            if words1 and words2:
-                intersection = words1.intersection(words2)
-                overlap = len(intersection) / max(len(words1), len(words2))
-                if overlap > word_overlap_threshold:
-                    is_duplicate = True
-                    break
+        is_duplicate = any(
+            _are_near_duplicates(art, kept, similarity_threshold, word_overlap_threshold, doc_freq, total)
+            for kept in unique_articles
+        )
 
         if not is_duplicate:
             unique_articles.append(art)
-            seen_titles.append(normalized_title)
 
         if len(unique_articles) >= max_items:
             break
@@ -460,8 +780,8 @@ def fetch_all_feeds_globally(sections, max_per_feed, config):
 
 
 def _local_group_articles_by_section(all_articles, max_per_section, config):
-    """Fallback grouping that preserves section membership without cross-section deduplication."""
-    limits_config = config.get("limits", {})
+    """Group by section with within-section dedup plus deterministic cross-section dedup."""
+    limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
     
     if max_per_section == 15:  # Use default if not explicitly provided
         max_per_section = limits_config.get("max_section_articles", 8)
@@ -478,13 +798,22 @@ def _local_group_articles_by_section(all_articles, max_per_section, config):
     for sec_name in section_order:
         grouped_articles[sec_name] = local_deduplicate_articles(grouped_articles[sec_name], max_items=max_per_section, config=config)
 
+    # Double-check: remove any remaining cross-section near-duplicates so the
+    # same story never appears in two sections (or twice in one section).
+    grouped_articles = deterministic_global_deduplicate(grouped_articles, section_order, config)
+
     return grouped_articles
 
 
 def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, client_ref):
-    """Use a single AI call to deduplicate across sections and filter insignificant stories."""
-    ai_config = config.get("ai", {})
-    limits_config = config.get("limits", {})
+    """Use a single AI call to deduplicate across sections and filter insignificant stories.
+
+    The AI pass is followed by a mandatory deterministic double-check
+    (`deterministic_global_deduplicate`) so missed near-duplicates are still
+    eliminated even when the model is unavailable or returns weak results.
+    """
+    ai_config = config.get("ai", {}) if isinstance(config, dict) else {}
+    limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
     
     filtering_prompt = get_config_value(ai_config, "prompts.article_filtering",
         "Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments.")
@@ -495,20 +824,36 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
     if not all_articles:
         return {}
 
+    section_names = []
+    for article in all_articles:
+        sec_name = article.get("section", "General")
+        if sec_name not in section_names:
+            section_names.append(sec_name)
+
     if not client_ref[0]:
         return _local_group_articles_by_section(all_articles, max_per_section, config)
 
     formatted_list = []
     for idx, article in enumerate(all_articles, 1):
         sec_name = article.get("section", "General")
-        title = article.get("title", "Untitled").strip()
-        formatted_list.append(f"[{idx}] {title} ({sec_name})")
+        title = (article.get("title") or "Untitled").strip()
+        summary = (article.get("summary") or "").strip()
+        # Include a short summary so the model can link paraphrased titles
+        # about the same event (e.g. different wordings of one death).
+        snippet = f" — {summary[:200]}" if summary else ""
+        formatted_list.append(f"[{idx}] {title}{snippet} ({sec_name})")
 
     # Combine deduplication instructions with user's filtering prompt
     dedup_instruction = (
         "You are selecting the most important and relevant news stories for a daily newspaper. "
-        "Review all article titles below, then return a JSON object mapping each section name to a list of article indices to keep. "
-        "Remove duplicates and near-duplicates across sections. "
+        "Review all article titles (with summary hints) below, then return a JSON object mapping each section name to a list of article indices to keep. "
+        "DEDUPLICATION IS MANDATORY: the same story must appear at most ONCE in the whole newspaper. "
+        "Treat as duplicates and keep only the single best version when articles share the same person and event even if worded very differently, for example: "
+        "'Christa Pike now walking after failed execution' vs 'Texas carries out execution since Christa Pike botched injections' vs 'Texas executes man, lawyers cited Christa Pike' (all one execution-fallout story); "
+        "'Margaret Hamilton, whose software helped land Apollo 11, dies at 90' vs 'Margaret Hamilton, scientist who worked on NASA Apollo program, dead at 90' (one obituary); "
+        "'Isaias becomes first hurricane of 2026' vs 'Tropical Storm Isaias forms in Gulf, could reach US as hurricane' (one storm). "
+        "Also merge same-storm, same-obituary, same-execution, and same-major-event rewrites from different outlets or sections. "
+        "Never keep two indices whose titles/summaries describe the same who+what, even across different sections. "
     )
     prompt = dedup_instruction + filtering_prompt + " Return ONLY valid JSON with this shape: {\"Section Name\": [1, 3, 5]}." + f"\n\nTitles:\n" + "\n".join(formatted_list)
 
@@ -562,16 +907,13 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
             if not grouped_articles:
                 raise ValueError("AI response did not contain any sections")
 
-            section_names = []
-            for article in all_articles:
-                sec_name = article.get("section", "General")
-                if sec_name not in section_names:
-                    section_names.append(sec_name)
-
             for sec_name in section_names:
                 grouped_articles.setdefault(sec_name, [])
 
             logging.info("AI global deduplication selected stories across %d articles using %s", len(all_articles), model_name)
+            # Double-check: deterministic pass guarantees no cross-section
+            # duplicates survive even if the model missed paraphrased rewrites.
+            grouped_articles = deterministic_global_deduplicate(grouped_articles, section_names, config)
             return grouped_articles
         except Exception as e:
             if _handle_ai_error(e, f"global deduplication ({model_name})", client_ref):
@@ -800,7 +1142,11 @@ def build_newspaper():
         }
 
     # Fetch Hacker News
-    output_content["hacker_news"] = fetch_hacker_news(config.get("hacker_news", {}))
+    raw_hn = fetch_hacker_news(config.get("hacker_news", {}))
+    # Double-check within HN so the same story never appears twice there.
+    # HN is intentionally kept independent of RSS categories (different source
+    # card), so we do not drop HN items merely for overlapping a category.
+    output_content["hacker_news"] = deduplicate_hacker_news_list(raw_hn, config)
 
     # Fetch Market Data
     output_content["market"] = fetch_market_data(config.get("market", {}))
