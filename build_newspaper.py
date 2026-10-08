@@ -4,6 +4,7 @@ import logging
 import re
 import html
 import ssl
+import hashlib
 import feedparser
 import urllib.request
 import urllib.parse
@@ -146,6 +147,44 @@ def clean_html(text):
     return html.unescape(text)
 
 
+_SOURCE_LABELS = {
+    "bbci.co.uk": "BBC",
+    "aljazeera.com": "Al Jazeera",
+    "nytimes.com": "NY Times",
+    "cbsnews.com": "CBS News",
+    "dw.com": "DW",
+    "cnbc.com": "CNBC",
+    "yahoo.com": "Yahoo Finance",
+    "dj.com": "WSJ",
+    "wsj.com": "WSJ",
+    "wfaa.com": "WFAA",
+    "google.com": "Google News",
+    "phys.org": "Phys.org",
+    "nature.com": "Nature",
+    "arstechnica.com": "Ars Technica",
+    "theverge.com": "The Verge",
+    "sciencedaily.com": "ScienceDaily",
+}
+
+
+def _source_from_url(url):
+    """Derive a short human-readable source label from a feed URL."""
+    try:
+        netloc = urllib.parse.urlsplit(url).netloc.lower()
+        netloc = netloc.split(":")[0]
+        for prefix in ("www.", "feeds.", "feed.", "rss."):
+            if netloc.startswith(prefix):
+                netloc = netloc[len(prefix):]
+        for domain, label in _SOURCE_LABELS.items():
+            if netloc == domain or netloc.endswith("." + domain):
+                return label
+        # Fallback: title-case the first domain label (e.g. "example.com" -> "Example").
+        first = netloc.split(".")[0] if netloc else ""
+        return first.replace("-", " ").title() if first else "News"
+    except Exception:
+        return "News"
+
+
 def fetch_quote_of_day():
     """Fetch the quote of the day from ZenQuotes with a graceful fallback."""
     try:
@@ -166,33 +205,70 @@ def fetch_quote_of_day():
     }
 
 
-def fetch_word_of_the_day(config=None):
-    """Fetch Word of the Day from local word-of-the-day.json file."""
+def fetch_word_of_the_day(config=None, today=None):
+    """Fetch Word of the Day deterministically from local word-of-the-day.json file.
+
+    The same calendar date always yields the same word (hash of YYYY-MM-DD
+    modulo list length), so rebuilding twice in one day doesn't change the
+    paper. Falls back to constants.FALLBACK_WORDS, then a hardcoded entry.
+    """
     if config:
         wod_config = config.get("word_of_day", {})
         if not wod_config.get("enabled", True):
             return None
 
+    if today is None:
+        date_str = datetime.now().date().isoformat()
+    elif isinstance(today, datetime):
+        date_str = today.date().isoformat()
+    elif hasattr(today, "isoformat"):
+        try:
+            date_str = today.isoformat()[:10]
+        except Exception:
+            date_str = str(today)[:10]
+    else:
+        date_str = str(today)[:10]
+
+    def _pick(words):
+        if not words:
+            return None
+        digest = hashlib.sha256(date_str.encode("utf-8")).hexdigest()
+        return words[int(digest, 16) % len(words)]
+
     # Load words from local JSON file
     try:
         with open("word-of-the-day.json", "r", encoding="utf-8") as f:
             words = json.load(f)
-        
+
         if words and isinstance(words, list):
-            # Select a random word from the list
-            selected_word = random.choice(words)
-            logging.info("Successfully selected random word from local list: %s", selected_word.get("word", ""))
-            return {
-                "word": selected_word.get("word", ""),
-                "part_of_speech": "",
-                "definition": selected_word.get("common_thought", ""),
-                "example": selected_word.get("practice_sentence", ""),
-                "source": "Local"
-            }
+            selected_word = _pick(words)
+            if selected_word:
+                logging.info("Selected word of the day for %s: %s", date_str, selected_word.get("word", ""))
+                return {
+                    "word": selected_word.get("word", ""),
+                    "part_of_speech": "",
+                    "definition": selected_word.get("common_thought", ""),
+                    "example": selected_word.get("practice_sentence", ""),
+                    "source": "Local"
+                }
     except Exception as e:
         logging.warning("Error loading word-of-the-day.json: %s", e)
 
-    # Ultimate fallback if file loading fails
+    # Fallback to curated constants list (deterministic too)
+    try:
+        selected = _pick(FALLBACK_WORDS)
+        if selected:
+            return {
+                "word": selected.get("word", ""),
+                "part_of_speech": selected.get("part_of_speech", ""),
+                "definition": selected.get("definition", ""),
+                "example": selected.get("example", ""),
+                "source": "Local"
+            }
+    except Exception as e:
+        logging.warning("Error selecting fallback word: %s", e)
+
+    # Ultimate fallback if everything fails
     return {
         "word": "serendipity",
         "part_of_speech": "noun",
@@ -361,6 +437,7 @@ def fetch_feed_entries(url, max_items, max_age_days, config):
         published = datetime(*parsed[:6], tzinfo=timezone.utc)
         return published >= datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
+    source_label = _source_from_url(url)
     articles = []
     for entry in feed.entries:
         if not entry_is_recent(entry):
@@ -369,11 +446,20 @@ def fetch_feed_entries(url, max_items, max_age_days, config):
         summary_raw = entry.get("summary", entry.get("description", ""))
         title = clean_html(title_raw).strip()
         summary = clean_html(summary_raw).strip()
+        published_iso = ""
+        parsed = entry.get("published_parsed") or entry.get("updated_parsed")
+        if parsed:
+            try:
+                published_iso = datetime(*parsed[:6], tzinfo=timezone.utc).isoformat()
+            except Exception:
+                published_iso = ""
         if title:  # Only add articles with valid titles
             articles.append({
                 "title": title,
                 "summary": summary,
-                "link": entry.get("link", "")
+                "link": entry.get("link", ""),
+                "source": source_label,
+                "published": published_iso
             })
             if len(articles) >= max_items:
                 break
@@ -1108,17 +1194,19 @@ def fetch_market_data(market_config):
     return market_data
 
 
-def build_newspaper():
+def build_newspaper(output_path="newspaper.json", config_path="config.json"):
     """Main function to load configuration, fetch data, deduplicate, and write newspaper.json."""
-    config = load_config("config.json")
+    config = load_config(config_path)
     limits_config = config.get("limits", {})
     max_section_articles = limits_config.get("max_section_articles", 8)
-    
+
     # Initialize AI client as a mutable reference
     client_ref = [initialize_ai_client()]
 
+    now_utc = datetime.now(timezone.utc)
     output_content = {
-        "generated_at": datetime.now().strftime("%B %d, %Y %I:%M %p"),
+        "generated_at": now_utc.astimezone().strftime("%B %d, %Y %I:%M %p"),
+        "generated_at_iso": now_utc.isoformat(),
         "quote": fetch_quote_of_day(),
         "word_of_day": fetch_word_of_the_day(config),
         "weather": fetch_weather(config, client_ref),
@@ -1152,10 +1240,10 @@ def build_newspaper():
     output_content["market"] = fetch_market_data(config.get("market", {}))
 
     # Save to newspaper.json
-    with open("newspaper.json", "w", encoding="utf-8") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output_content, f, indent=2, ensure_ascii=False)
 
-    logging.info("Successfully generated newspaper.json with %d sections.", len(output_content["categories"]))
+    logging.info("Successfully generated %s with %d sections.", output_path, len(output_content["categories"]))
     
     # Log rate limit usage from actual API responses
     if rate_limit_tracker.model_limits:
@@ -1174,6 +1262,8 @@ def build_newspaper():
             if usage.get('rpd_limit'):
                 logging.info("  RPD Limit: %d (%.1f%% used)", usage['rpd_limit'], 
                            usage.get('rpd_used', 0) / max(usage['rpd_limit'], 1) * 100)
+
+    return output_content
 
 
 if __name__ == "__main__":

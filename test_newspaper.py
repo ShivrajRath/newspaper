@@ -1,6 +1,7 @@
 import os
 import json
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 import build_newspaper as builder_module
@@ -154,11 +155,19 @@ class TestNewspaperBuilder(unittest.TestCase):
              patch.object(builder_module, "fetch_hacker_news", return_value=[]), \
              patch.object(builder_module, "fetch_market_data", return_value={}), \
              patch.object(builder_module, "initialize_ai_client", return_value=FakeClient()), \
-             patch.object(builder_module, "fetch_weather", return_value={}):
-            builder_module.build_newspaper()
-
-        with open("newspaper.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
+             patch.object(builder_module, "fetch_weather", return_value={}), \
+             patch.object(builder_module, "fetch_riddle", return_value={}), \
+             patch.object(builder_module, "fetch_joke", return_value=None), \
+             patch.object(builder_module, "fetch_word_of_the_day", return_value=None):
+            with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                builder_module.build_newspaper(output_path=tmp_path)
+                with open(tmp_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
 
         selected_titles = [article["title"] for article in data["categories"]["Tech"]["articles"]]
         self.assertEqual(selected_titles, ["Alpha Story", "Gamma Story"])
@@ -179,25 +188,58 @@ class TestNewspaperBuilder(unittest.TestCase):
              patch.object(builder_module, "fetch_section_articles", return_value=articles), \
              patch.object(builder_module, "fetch_quote_of_day", return_value={"text": "", "author": ""}), \
              patch.object(builder_module, "fetch_hacker_news", return_value=[]), \
-             patch.object(builder_module, "fetch_market_data", return_value={}):
-            builder_module.build_newspaper()
-
-        with open("newspaper.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
+             patch.object(builder_module, "fetch_market_data", return_value={}), \
+             patch.object(builder_module, "fetch_weather", return_value={}), \
+             patch.object(builder_module, "fetch_riddle", return_value={}), \
+             patch.object(builder_module, "fetch_joke", return_value=None), \
+             patch.object(builder_module, "fetch_word_of_the_day", return_value=None):
+            with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                builder_module.build_newspaper(output_path=tmp_path)
+                with open(tmp_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
 
         self.assertLessEqual(len(data["categories"]["Tech"]["articles"]), 8)
 
     def test_newspaper_json_structure(self):
-        build_newspaper()
-        self.assertTrue(os.path.exists("newspaper.json"))
-        with open("newspaper.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
+        config = {
+            "sections": [{"name": "Tech", "feeds": ["http://example.com/rss.xml"]}],
+            "hacker_news": {"enabled": False},
+            "market": {"enabled": False},
+        }
+        with patch.object(builder_module, "load_config", return_value=config), \
+             patch.object(builder_module, "fetch_section_articles", return_value=[
+                 {"title": "T", "summary": "S", "link": "http://example.com/1"}
+             ]), \
+             patch.object(builder_module, "fetch_quote_of_day", return_value={"text": "Q", "author": "A"}), \
+             patch.object(builder_module, "fetch_hacker_news", return_value=[]), \
+             patch.object(builder_module, "fetch_market_data", return_value={}), \
+             patch.object(builder_module, "fetch_weather", return_value={"location": "Testville", "description": "Sunny"}), \
+             patch.object(builder_module, "fetch_riddle", return_value={}), \
+             patch.object(builder_module, "fetch_joke", return_value=None), \
+             patch.object(builder_module, "fetch_word_of_the_day", return_value={"word": "test"}):
+            with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                data = builder_module.build_newspaper(output_path=tmp_path)
+                self.assertTrue(os.path.exists(tmp_path))
+                with open(tmp_path, "r", encoding="utf-8") as f:
+                    on_disk = json.load(f)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
         self.assertIn("generated_at", data)
+        self.assertIn("generated_at_iso", data)
         self.assertIn("categories", data)
         self.assertIn("market", data)
         self.assertIn("hacker_news", data)
         self.assertIn("quote", data)
         self.assertIn("word_of_day", data)
+        self.assertEqual(data, on_disk)
 
     def test_fallback_words_count_and_structure(self):
         from constants import FALLBACK_WORDS
@@ -210,69 +252,45 @@ class TestNewspaperBuilder(unittest.TestCase):
             self.assertTrue(bool(item["word"].strip()))
             self.assertTrue(bool(item["definition"].strip()))
 
-    def test_fetch_word_of_the_day_wordnik_success(self):
-        class FakeResponse:
-            def __init__(self, data):
-                self._data = data
-
-            def read(self):
-                return json.dumps(self._data).encode("utf-8")
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        wordnik_payload = {
-            "word": "pulchritudinous",
-            "definitions": [
-                {
-                    "text": "Characterized by physical beauty.",
-                    "partOfSpeech": "adjective"
-                }
-            ],
-            "examples": [
-                {
-                    "text": "The breathtaking landscape was truly pulchritudinous."
-                }
-            ]
-        }
-
-        with patch.dict(os.environ, {"WORDNIK_API_KEY": "fake_test_key"}), \
-             patch.object(builder_module, "safe_urlopen", return_value=FakeResponse(wordnik_payload)):
-            result = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": True}})
-
-        self.assertIsNotNone(result)
-        self.assertEqual(result["word"], "pulchritudinous")
-        self.assertEqual(result["part_of_speech"], "adjective")
-        self.assertEqual(result["definition"], "Characterized by physical beauty.")
-        self.assertEqual(result["example"], "The breathtaking landscape was truly pulchritudinous.")
-        self.assertEqual(result["source"], "Wordnik")
-
-    def test_fetch_word_of_the_day_fallback_when_no_api_key(self):
-        with patch.dict(os.environ, {}, clear=True), \
-             patch.object(builder_module, "WORDNIK_API_KEY", None):
-            result = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": True}})
-
-        self.assertIsNotNone(result)
-        self.assertTrue(bool(result["word"]))
-        self.assertTrue(bool(result["definition"]))
-        self.assertEqual(result["source"], "")
-
-    def test_fetch_word_of_the_day_fallback_on_api_error(self):
-        with patch.dict(os.environ, {"WORDNIK_API_KEY": "fake_test_key"}), \
-             patch.object(builder_module, "safe_urlopen", side_effect=Exception("API connection timeout")):
-            result = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": True}})
-
-        self.assertIsNotNone(result)
-        self.assertTrue(bool(result["word"]))
-        self.assertTrue(bool(result["definition"]))
-        self.assertEqual(result["source"], "")
+    def test_fetch_word_of_the_day_deterministic(self):
+        from datetime import date
+        r1 = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": True}}, today=date(2026, 1, 15))
+        r2 = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": True}}, today=date(2026, 1, 15))
+        self.assertIsNotNone(r1)
+        self.assertEqual(r1, r2)
+        self.assertTrue(bool(r1["word"]))
+        self.assertTrue(bool(r1["definition"]))
+        self.assertIn("source", r1)
 
     def test_fetch_word_of_the_day_disabled(self):
         result = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": False}})
         self.assertIsNone(result)
+
+    def test_source_from_url_labels(self):
+        self.assertEqual(builder_module._source_from_url("http://feeds.bbci.co.uk/news/world/rss.xml"), "BBC")
+        self.assertEqual(builder_module._source_from_url("https://www.aljazeera.com/xml/rss/all.xml"), "Al Jazeera")
+        self.assertEqual(builder_module._source_from_url("https://feeds.arstechnica.com/arstechnica/index"), "Ars Technica")
+        self.assertTrue(bool(builder_module._source_from_url("https://example.com/rss.xml")))
+
+    def test_fetch_feed_entries_adds_source_and_published(self):
+        class FakeFeed:
+            feed = {"title": "Example"}
+            entries = [{
+                "title": "Hello",
+                "summary": "World",
+                "link": "https://example.com/1",
+                "published_parsed": (2026, 10, 8, 6, 0, 0, 0, 0, 0),
+            }]
+            bozo = False
+            bozo_exception = None
+        with patch.object(builder_module, "safe_fetch_url", return_value=b"<rss/>"), \
+             patch("feedparser.parse", return_value=FakeFeed()):
+            articles = builder_module.fetch_feed_entries("https://example.com/rss.xml", 15, 30, {})
+        self.assertEqual(len(articles), 1)
+        self.assertEqual(articles[0]["source"], "Example")
+        self.assertTrue(bool(articles[0]["source"]))
+        self.assertIn("published", articles[0])
+        self.assertTrue(articles[0]["published"].startswith("2026-10-08"))
 
 
 if __name__ == "__main__":

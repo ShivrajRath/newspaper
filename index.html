@@ -85,7 +85,7 @@
         .header-badges {
             display: flex;
             justify-content: center;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             gap: 10px;
             margin-top: 12px;
             align-items: center;
@@ -167,6 +167,63 @@
             stroke-width: 2;
             fill: none;
             transition: stroke 0.2s ease;
+        }
+
+        .stale-banner {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            color: #92400e;
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 0.88rem;
+            text-align: center;
+        }
+
+        [data-theme="dark"] .stale-banner {
+            background: #45300a;
+            border-color: #b45309;
+            color: #fde68a;
+        }
+
+        .section-nav {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .section-nav a {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.72rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            text-decoration: none;
+            color: var(--accent-color);
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            border-radius: 999px;
+            padding: 6px 12px;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .section-nav a:hover {
+            background: var(--accent-color);
+            color: var(--card-bg);
+        }
+
+        .article-meta {
+            color: var(--muted-text);
+            display: block;
+            margin-top: 8px;
+            font-size: 0.78rem;
+            letter-spacing: 0.02em;
+        }
+
+        [data-theme="dark"] .article-links small,
+        [data-theme="dark"] .article-meta {
+            color: #b8b8b8;
         }
 
 
@@ -808,7 +865,7 @@
     <header>
         <h1>The Daily Brief</h1>
         <div class="header-badges">
-            <span class="edition-badge" id="edition-badge">Frisco, TX · Daily Edition</span>
+            <span class="edition-badge" id="edition-badge">Local Edition · Daily Edition</span>
             <button class="theme-toggle-btn no-print" onclick="toggleTheme()" aria-label="Toggle theme">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
                     stroke-linejoin="round" id="theme-icon">
@@ -839,7 +896,11 @@
         <p class="quote-author" id="quote-author"></p>
     </div>
 
+    <div class="stale-banner" id="stale-banner" hidden></div>
+
     <div class="ticker-bar" id="ticker-bar">Loading market data...</div>
+
+    <nav class="section-nav no-print" id="section-nav" aria-label="Sections"></nav>
 
     <div class="grid" id="content-grid">Loading articles...</div>
 
@@ -850,7 +911,8 @@
     <script>
         async function loadNewspaper() {
             try {
-                const response = await fetch('newspaper.json');
+                const response = await fetch('newspaper.json', { cache: 'no-store' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
 
                 const formattedDate = new Date().toLocaleDateString('en-US', {
@@ -861,7 +923,24 @@
                 const pageTitle = `The Daily Brief - ${formattedDate}`;
                 document.title = pageTitle;
                 document.getElementById('page-title').textContent = pageTitle;
-                document.getElementById('edition-badge').textContent = `Frisco, TX · Daily Edition · ${data.generated_at || data.date || 'Unknown'}`;
+                const locationName = (data.weather && data.weather.location) || 'Local Edition';
+                document.getElementById('edition-badge').textContent = `${locationName} · Daily Edition · ${data.generated_at || data.date || 'Unknown'}`;
+
+                // Stale-edition banner: warn when the paper is older than ~30h.
+                try {
+                    const iso = data.generated_at_iso || data.generated_at || data.date;
+                    const built = iso ? new Date(iso) : null;
+                    if (built && !isNaN(built)) {
+                        const ageHrs = (Date.now() - built.getTime()) / 36e5;
+                        if (ageHrs > 30) {
+                            const banner = document.getElementById('stale-banner');
+                            const days = Math.floor(ageHrs / 24);
+                            const ageText = days >= 1 ? `${days} day${days > 1 ? 's' : ''}` : `${Math.floor(ageHrs)} hours`;
+                            banner.textContent = `This edition is ${ageText} old (built ${built.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}). Re-run the daily build for fresh headlines.`;
+                            banner.hidden = false;
+                        }
+                    }
+                } catch (e) { console.warn('stale check failed', e); }
 
                 const quote = data.quote || {};
                 document.getElementById('quote-text').textContent = quote.text || 'Make each day your masterpiece.';
@@ -894,19 +973,45 @@
                     return lines.join('\n');
                 };
 
+                const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+                }[c]));
+                const isSafeHttpUrl = (u) => {
+                    try {
+                        const parsed = new URL(u, window.location.href);
+                        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+                    } catch { return false; }
+                };
+                const formatMetaDate = (iso) => {
+                    if (!iso) return '';
+                    const d = new Date(iso);
+                    if (isNaN(d)) return '';
+                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                };
+                const slugify = (s) => String(s || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
+
                 // Render News Categories as individual breakable cards
+                const sectionNames = Object.keys(data.categories || {});
                 const categoryCards = Object.entries(data.categories || {}).map(([catName, details], index) => {
+                    const slug = `section-${slugify(catName)}`;
                     const articlesHTML = (details.articles || []).map(art => {
-                        const t = stripHtml(art.title) || 'Untitled';
-                        const summ = stripHtml(art.summary);
-                        const titleHTML = `<strong>${t}</strong>`;
-                        return `<div class="article-item">${titleHTML}${summ ? `<p>${summ}</p>` : ''}</div>`;
+                        const t = escapeHtml(stripHtml(art.title) || 'Untitled');
+                        const summ = escapeHtml(stripHtml(art.summary));
+                        const link = (art.link && isSafeHttpUrl(art.link)) ? art.link : '';
+                        const titleHTML = link
+                            ? `<a href="${link}" target="_blank" rel="noopener noreferrer"><strong>${t}</strong></a>`
+                            : `<strong>${t}</strong>`;
+                        const source = escapeHtml(stripHtml(art.source || ''));
+                        const pubDate = formatMetaDate(art.published);
+                        const metaBits = [source, pubDate].filter(Boolean).join(' · ');
+                        const metaHTML = metaBits ? `<small class="article-meta">${metaBits}</small>` : '';
+                        return `<div class="article-item">${titleHTML}${summ ? `<p>${summ}</p>` : ''}${metaHTML}</div>`;
                     }).join('');
                     if (!articlesHTML) return '';
 
                     return `
-                        <div class="card news-card${index === 0 ? ' lead-card' : ''}">
-                            <h2>${catName}</h2>
+                        <div class="card news-card${index === 0 ? ' lead-card' : ''}" id="${slug}">
+                            <h2>${escapeHtml(catName)}</h2>
                             <div class="article-links">${articlesHTML}</div>
                         </div>
                     `;
@@ -916,9 +1021,12 @@
                 let hnCard = '';
                 if (data.hacker_news && data.hacker_news.length > 0) {
                     const hnItems = data.hacker_news.map(hn => {
-                        const title = stripHtml(hn.title || 'Untitled');
-                        const desc = stripHtml(hn.description || '');
-                        const titleHTML = `<a href="${hn.url}" target="_blank" rel="noopener noreferrer"><strong>${title}</strong></a>`;
+                        const title = escapeHtml(stripHtml(hn.title || 'Untitled'));
+                        const desc = escapeHtml(stripHtml(hn.description || ''));
+                        const safeUrl = (hn.url && isSafeHttpUrl(hn.url)) ? hn.url : '';
+                        const titleHTML = safeUrl
+                            ? `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer"><strong>${title}</strong></a>`
+                            : `<strong>${title}</strong>`;
                         return `<div class="article-item">${titleHTML}${desc ? `<p>${desc}</p>` : ''}</div>`;
                     }).join('');
 
@@ -966,7 +1074,7 @@
                 if (wx.description) {
                     extras.push(`
                         <div class="card extra-card weather-card">
-                            <h2>📍 ${wx.location || 'Frisco, TX'} Weather</h2>
+                            <h2>📍 ${escapeHtml(wx.location || locationName)} Weather</h2>
                             <div class="weather-description">${wx.description}</div>
                         </div>
                     `);
@@ -1024,6 +1132,17 @@
                 } else {
                     orderedHTML = [...categoryCards, ...extras].join('');
                 }
+
+                const navEl = document.getElementById('section-nav');
+                if (navEl) {
+                    const navLinks = sectionNames
+                        .map((n) => `<a href="#section-${slugify(n)}">${escapeHtml(n)}</a>`)
+                        .join('');
+                    const hnLink = (data.hacker_news && data.hacker_news.length > 0) ? `<a href="#hn-top">Hacker News</a>` : '';
+                    navEl.innerHTML = navLinks + hnLink;
+                    navEl.style.display = (navLinks + hnLink) ? '' : 'none';
+                }
+                if (hnCard) hnCard = hnCard.replace('class="card no-print"', 'class="card no-print" id="hn-top"');
 
                 document.getElementById('content-grid').innerHTML = orderedHTML + hnCard;
 
