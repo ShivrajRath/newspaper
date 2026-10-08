@@ -416,8 +416,6 @@
             .quote-card,
             .card {
                 box-shadow: none;
-                break-inside: avoid-column;
-                page-break-inside: avoid;
                 /* Strip all colored backgrounds and borders — flat white */
                 background: var(--card-bg) !important;
                 display: block;
@@ -426,6 +424,30 @@
                 border-radius: 0;
                 margin: 0 0 8px 0;
                 padding: 6px 4px 8px 4px;
+            }
+
+            .quote-card {
+                break-inside: avoid-column;
+                page-break-inside: avoid;
+            }
+
+            /* Long news sections may split across columns so the two
+               columns stay balanced; individual articles stay intact. */
+            .card.news-card {
+                break-inside: auto;
+                page-break-inside: auto;
+                -webkit-column-break-inside: auto;
+            }
+
+            /* Small filler boxes stay intact and keep a light frame so
+               they read as separate boxes, not part of the section above. */
+            .card.extra-card {
+                break-inside: avoid-column;
+                page-break-inside: avoid;
+                -webkit-column-break-inside: avoid;
+                border: 1px solid #bbb !important;
+                border-radius: 3px;
+                padding: 6px;
             }
 
             /* Use 2-column layout for better space utilization on A4 */
@@ -557,11 +579,11 @@
                 display: block !important;
             }
 
-            /* Improve column break behavior for mobile */
-            .card {
+            /* Keep headings with the article that follows them */
+            .card h2 {
+                break-after: avoid !important;
                 break-inside: avoid !important;
-                page-break-inside: avoid !important;
-                -webkit-column-break-inside: avoid !important;
+                page-break-after: avoid !important;
             }
 
             /* Ensure content doesn't get cut off between columns */
@@ -872,8 +894,8 @@
                     return lines.join('\n');
                 };
 
-                // Render News Categories
-                let gridHTML = Object.entries(data.categories || {}).map(([catName, details], index) => {
+                // Render News Categories as individual breakable cards
+                const categoryCards = Object.entries(data.categories || {}).map(([catName, details], index) => {
                     const articlesHTML = (details.articles || []).map(art => {
                         const t = stripHtml(art.title) || 'Untitled';
                         const summ = stripHtml(art.summary);
@@ -883,14 +905,15 @@
                     if (!articlesHTML) return '';
 
                     return `
-                        <div class="card${index === 0 ? ' lead-card' : ''}">
+                        <div class="card news-card${index === 0 ? ' lead-card' : ''}">
                             <h2>${catName}</h2>
                             <div class="article-links">${articlesHTML}</div>
                         </div>
                     `;
-                }).join('');
+                }).filter(Boolean);
 
-                // Render Hacker News Card
+                // Render Hacker News Card (screen only, always last)
+                let hnCard = '';
                 if (data.hacker_news && data.hacker_news.length > 0) {
                     const hnItems = data.hacker_news.map(hn => {
                         const title = stripHtml(hn.title || 'Untitled');
@@ -899,7 +922,7 @@
                         return `<div class="article-item">${titleHTML}${desc ? `<p>${desc}</p>` : ''}</div>`;
                     }).join('');
 
-                    gridHTML += `
+                    hnCard = `
                         <div class="card no-print">
                             <h2>Hacker News Top Stories</h2>
                             <div class="article-links" style="border-top: none; padding-top: 0;">${hnItems}</div>
@@ -907,8 +930,8 @@
                     `;
                 }
 
-                // ── Render Extras (Weather & Word of the Day) ──
-                let extrasHTML = '';
+                // ── Build Extras as separate small cards ──
+                const extras = [];
 
                 // Word of the Day Card
                 const wod = data.word_of_day;
@@ -924,8 +947,8 @@
                         sourceHTML = `<div class="word-source">Source: Wordnik</div>`;
                     }
 
-                    extrasHTML += `
-                        <div class="card word-card">
+                    extras.push(`
+                        <div class="card extra-card word-card">
                             <h2>📖 Word of the Day</h2>
                             <div class="word-header">
                                 <span class="word-title">${word}</span>
@@ -935,25 +958,25 @@
                             ${ex ? `<p class="word-example">"${ex}"</p>` : ''}
                             ${sourceHTML}
                         </div>
-                    `;
+                    `);
                 }
 
                 // Weather Card
                 const wx = data.weather || {};
                 if (wx.description) {
-                    extrasHTML += `
-                        <div class="card weather-card">
+                    extras.push(`
+                        <div class="card extra-card weather-card">
                             <h2>📍 ${wx.location || 'Frisco, TX'} Weather</h2>
                             <div class="weather-description">${wx.description}</div>
                         </div>
-                    `;
+                    `);
                 }
 
                 // Riddle Card
                 const riddle = data.riddle;
                 if (riddle && riddle.question) {
-                    extrasHTML += `
-                        <div class="card riddle-card" id="riddle-card">
+                    extras.push(`
+                        <div class="card extra-card riddle-card" id="riddle-card">
                             <h2>🧩 Daily Riddle</h2>
                             <div class="riddle-question" id="riddle-question">${riddle.question}</div>
                             <div class="riddle-answer-container">
@@ -961,31 +984,48 @@
                                 <div class="riddle-answer" id="riddle-answer">${riddle.answer}</div>
                             </div>
                         </div>
-                    `;
+                    `);
                 }
 
                 // Joke Card
                 const joke = data.joke;
                 if (joke) {
                     if (joke.type === 'single' && joke.content) {
-                        extrasHTML += `
-                            <div class="card joke-card" id="joke-card">
+                        extras.push(`
+                            <div class="card extra-card joke-card" id="joke-card">
                                 <h2>😄 Kids' Joke of the Day</h2>
                                 <div class="joke-content">${joke.content}</div>
                             </div>
-                        `;
+                        `);
                     } else if (joke.type === 'twopart' && joke.setup && joke.delivery) {
-                        extrasHTML += `
-                            <div class="card joke-card" id="joke-card">
+                        extras.push(`
+                            <div class="card extra-card joke-card" id="joke-card">
                                 <h2>😄 Kids' Joke of the Day</h2>
                                 <div class="joke-setup">${joke.setup}</div>
                                 <div class="joke-delivery">${joke.delivery}</div>
                             </div>
-                        `;
+                        `);
                     }
                 }
 
-                document.getElementById('content-grid').innerHTML = gridHTML + extrasHTML;
+                // ── Interleave extras to balance print columns ──
+                // Previously all four fillers trailed the last (usually
+                // longest) section, so the final page had a short left
+                // column (e.g. Local) and a very long right column
+                // (Science + Word + Weather + Riddle + Joke). Move the
+                // first half ahead of the last section to fill the left
+                // column gap; the rest close the paper on the right.
+                let orderedHTML = '';
+                if (categoryCards.length >= 2 && extras.length >= 2) {
+                    const mid = Math.ceil(extras.length / 2);
+                    const headExtras = extras.slice(0, mid);
+                    const tailExtras = extras.slice(mid);
+                    orderedHTML = [...categoryCards.slice(0, -1), ...headExtras, categoryCards[categoryCards.length - 1], ...tailExtras].join('');
+                } else {
+                    orderedHTML = [...categoryCards, ...extras].join('');
+                }
+
+                document.getElementById('content-grid').innerHTML = orderedHTML + hnCard;
 
             } catch (err) {
                 console.error(err);
