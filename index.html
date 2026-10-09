@@ -186,33 +186,6 @@
             color: #fde68a;
         }
 
-        .section-nav {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 8px;
-            margin-bottom: 20px;
-        }
-
-        .section-nav a {
-            font-family: "JetBrains Mono", monospace;
-            font-size: 0.72rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            text-decoration: none;
-            color: var(--accent-color);
-            border: 1px solid var(--border-color);
-            background: var(--card-bg);
-            border-radius: 999px;
-            padding: 6px 12px;
-            transition: background 0.2s ease, color 0.2s ease;
-        }
-
-        .section-nav a:hover {
-            background: var(--accent-color);
-            color: var(--card-bg);
-        }
-
         [data-theme="dark"] .article-links small {
             color: #b8b8b8;
         }
@@ -487,15 +460,16 @@
                 -webkit-column-break-inside: auto;
             }
 
-            /* Small filler boxes stay intact and keep a light frame so
-               they read as separate boxes, not part of the section above. */
+            /* Small filler boxes stay intact without a frame in print,
+               so they flow as plain text like the sections above. */
             .card.extra-card {
                 break-inside: avoid-column;
                 page-break-inside: avoid;
                 -webkit-column-break-inside: avoid;
-                border: 1px solid #bbb !important;
-                border-radius: 3px;
-                padding: 6px;
+                border: none !important;
+                border-radius: 0;
+                padding: 6px 4px 8px 4px;
+                background: #ffffff !important;
             }
 
             /* Use 2-column layout for better space utilization on A4 */
@@ -593,16 +567,29 @@
                 padding: 4px 8px;
             }
 
-            /* Riddle print styles - show answer on print */
+            /* Riddle print styles - show answer on print, no box */
             .riddle-answer {
                 display: block !important;
                 transform: rotate(180deg) scaleX(-1);
                 margin: 12px 0;
-                padding: 8px;
-                background: #f5f5f5;
-                border: 1px solid #ccc;
+                padding: 0;
+                background: none !important;
+                border: none !important;
                 -webkit-transform: rotate(180deg) scaleX(-1);
                 -moz-transform: rotate(180deg) scaleX(-1);
+            }
+
+            /* Extras print as plain text - no inner boxes or rules */
+            .card.extra-card .joke-delivery,
+            .card.extra-card .word-example {
+                background: none !important;
+                border: none !important;
+                padding-left: 0;
+            }
+
+            .card.extra-card .word-pos {
+                background: none !important;
+                padding: 0;
             }
 
             .show-answer-btn {
@@ -891,8 +878,6 @@
 
     <div class="ticker-bar" id="ticker-bar">Loading market data...</div>
 
-    <nav class="section-nav no-print" id="section-nav" aria-label="Sections"></nav>
-
     <div class="grid" id="content-grid">Loading articles...</div>
 
     <div class="end-sign" id="end-sign">— End of Paper —</div>
@@ -973,12 +958,8 @@
                         return parsed.protocol === 'http:' || parsed.protocol === 'https:';
                     } catch { return false; }
                 };
-                const slugify = (s) => String(s || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
-
                 // Render News Categories as individual breakable cards
-                const sectionNames = Object.keys(data.categories || {});
                 const categoryCards = Object.entries(data.categories || {}).map(([catName, details], index) => {
-                    const slug = `section-${slugify(catName)}`;
                     const articlesHTML = (details.articles || []).map(art => {
                         const t = escapeHtml(stripHtml(art.title) || 'Untitled');
                         const summ = escapeHtml(stripHtml(art.summary));
@@ -991,7 +972,7 @@
                     if (!articlesHTML) return '';
 
                     return `
-                        <div class="card news-card${index === 0 ? ' lead-card' : ''}" id="${slug}">
+                        <div class="card news-card${index === 0 ? ' lead-card' : ''}">
                             <h2>${escapeHtml(catName)}</h2>
                             <div class="article-links">${articlesHTML}</div>
                         </div>
@@ -1113,17 +1094,6 @@
                 } else {
                     orderedHTML = [...categoryCards, ...extras].join('');
                 }
-
-                const navEl = document.getElementById('section-nav');
-                if (navEl) {
-                    const navLinks = sectionNames
-                        .map((n) => `<a href="#section-${slugify(n)}">${escapeHtml(n)}</a>`)
-                        .join('');
-                    const hnLink = (data.hacker_news && data.hacker_news.length > 0) ? `<a href="#hn-top">Hacker News</a>` : '';
-                    navEl.innerHTML = navLinks + hnLink;
-                    navEl.style.display = (navLinks + hnLink) ? '' : 'none';
-                }
-                if (hnCard) hnCard = hnCard.replace('class="card no-print"', 'class="card no-print" id="hn-top"');
 
                 document.getElementById('content-grid').innerHTML = orderedHTML + hnCard;
 
