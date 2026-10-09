@@ -266,13 +266,7 @@ class TestNewspaperBuilder(unittest.TestCase):
         result = builder_module.fetch_word_of_the_day({"word_of_day": {"enabled": False}})
         self.assertIsNone(result)
 
-    def test_source_from_url_labels(self):
-        self.assertEqual(builder_module._source_from_url("http://feeds.bbci.co.uk/news/world/rss.xml"), "BBC")
-        self.assertEqual(builder_module._source_from_url("https://www.aljazeera.com/xml/rss/all.xml"), "Al Jazeera")
-        self.assertEqual(builder_module._source_from_url("https://feeds.arstechnica.com/arstechnica/index"), "Ars Technica")
-        self.assertTrue(bool(builder_module._source_from_url("https://example.com/rss.xml")))
-
-    def test_fetch_feed_entries_adds_source_and_published(self):
+    def test_fetch_feed_entries_keeps_link(self):
         class FakeFeed:
             feed = {"title": "Example"}
             entries = [{
@@ -287,10 +281,8 @@ class TestNewspaperBuilder(unittest.TestCase):
              patch("feedparser.parse", return_value=FakeFeed()):
             articles = builder_module.fetch_feed_entries("https://example.com/rss.xml", 15, 30, {})
         self.assertEqual(len(articles), 1)
-        self.assertEqual(articles[0]["source"], "Example")
-        self.assertTrue(bool(articles[0]["source"]))
-        self.assertIn("published", articles[0])
-        self.assertTrue(articles[0]["published"].startswith("2026-10-08"))
+        self.assertEqual(articles[0]["title"], "Hello")
+        self.assertEqual(articles[0]["link"], "https://example.com/1")
 
 
 if __name__ == "__main__":

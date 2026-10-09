@@ -213,16 +213,7 @@
             color: var(--card-bg);
         }
 
-        .article-meta {
-            color: var(--muted-text);
-            display: block;
-            margin-top: 8px;
-            font-size: 0.78rem;
-            letter-spacing: 0.02em;
-        }
-
-        [data-theme="dark"] .article-links small,
-        [data-theme="dark"] .article-meta {
+        [data-theme="dark"] .article-links small {
             color: #b8b8b8;
         }
 
@@ -982,12 +973,6 @@
                         return parsed.protocol === 'http:' || parsed.protocol === 'https:';
                     } catch { return false; }
                 };
-                const formatMetaDate = (iso) => {
-                    if (!iso) return '';
-                    const d = new Date(iso);
-                    if (isNaN(d)) return '';
-                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                };
                 const slugify = (s) => String(s || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
 
                 // Render News Categories as individual breakable cards
@@ -1001,11 +986,7 @@
                         const titleHTML = link
                             ? `<a href="${link}" target="_blank" rel="noopener noreferrer"><strong>${t}</strong></a>`
                             : `<strong>${t}</strong>`;
-                        const source = escapeHtml(stripHtml(art.source || ''));
-                        const pubDate = formatMetaDate(art.published);
-                        const metaBits = [source, pubDate].filter(Boolean).join(' · ');
-                        const metaHTML = metaBits ? `<small class="article-meta">${metaBits}</small>` : '';
-                        return `<div class="article-item">${titleHTML}${summ ? `<p>${summ}</p>` : ''}${metaHTML}</div>`;
+                        return `<div class="article-item">${titleHTML}${summ ? `<p>${summ}</p>` : ''}</div>`;
                     }).join('');
                     if (!articlesHTML) return '';
 

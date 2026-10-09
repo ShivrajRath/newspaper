@@ -147,44 +147,6 @@ def clean_html(text):
     return html.unescape(text)
 
 
-_SOURCE_LABELS = {
-    "bbci.co.uk": "BBC",
-    "aljazeera.com": "Al Jazeera",
-    "nytimes.com": "NY Times",
-    "cbsnews.com": "CBS News",
-    "dw.com": "DW",
-    "cnbc.com": "CNBC",
-    "yahoo.com": "Yahoo Finance",
-    "dj.com": "WSJ",
-    "wsj.com": "WSJ",
-    "wfaa.com": "WFAA",
-    "google.com": "Google News",
-    "phys.org": "Phys.org",
-    "nature.com": "Nature",
-    "arstechnica.com": "Ars Technica",
-    "theverge.com": "The Verge",
-    "sciencedaily.com": "ScienceDaily",
-}
-
-
-def _source_from_url(url):
-    """Derive a short human-readable source label from a feed URL."""
-    try:
-        netloc = urllib.parse.urlsplit(url).netloc.lower()
-        netloc = netloc.split(":")[0]
-        for prefix in ("www.", "feeds.", "feed.", "rss."):
-            if netloc.startswith(prefix):
-                netloc = netloc[len(prefix):]
-        for domain, label in _SOURCE_LABELS.items():
-            if netloc == domain or netloc.endswith("." + domain):
-                return label
-        # Fallback: title-case the first domain label (e.g. "example.com" -> "Example").
-        first = netloc.split(".")[0] if netloc else ""
-        return first.replace("-", " ").title() if first else "News"
-    except Exception:
-        return "News"
-
-
 def fetch_quote_of_day():
     """Fetch the quote of the day from ZenQuotes with a graceful fallback."""
     try:
@@ -437,7 +399,6 @@ def fetch_feed_entries(url, max_items, max_age_days, config):
         published = datetime(*parsed[:6], tzinfo=timezone.utc)
         return published >= datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
-    source_label = _source_from_url(url)
     articles = []
     for entry in feed.entries:
         if not entry_is_recent(entry):
@@ -446,20 +407,11 @@ def fetch_feed_entries(url, max_items, max_age_days, config):
         summary_raw = entry.get("summary", entry.get("description", ""))
         title = clean_html(title_raw).strip()
         summary = clean_html(summary_raw).strip()
-        published_iso = ""
-        parsed = entry.get("published_parsed") or entry.get("updated_parsed")
-        if parsed:
-            try:
-                published_iso = datetime(*parsed[:6], tzinfo=timezone.utc).isoformat()
-            except Exception:
-                published_iso = ""
         if title:  # Only add articles with valid titles
             articles.append({
                 "title": title,
                 "summary": summary,
-                "link": entry.get("link", ""),
-                "source": source_label,
-                "published": published_iso
+                "link": entry.get("link", "")
             })
             if len(articles) >= max_items:
                 break
