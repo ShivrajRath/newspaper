@@ -739,6 +739,7 @@ def deduplicate_hacker_news_list(hacker_news, config):
     """Remove internal near-duplicates within the Hacker News list."""
     if not hacker_news:
         return []
+    hacker_news = _filter_watch_bait(hacker_news)
     limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
     sim_threshold = limits_config.get("deduplication_similarity_threshold", 0.65)
     overlap_threshold = limits_config.get("word_overlap_threshold", 0.7)
@@ -817,13 +818,56 @@ def fetch_all_feeds_globally(sections, max_per_feed, config):
     return all_articles
 
 
+_WATCH_BAIT_PREFIX_RE = re.compile(r'^\s*(\[watch\]|watch)\s*[:\|\-\u2013\u2014]\s*', re.IGNORECASE)
+_WATCH_BRACKET_RE = re.compile(r'^\s*\[watch\]', re.IGNORECASE)
+_WATCH_LEAD_WORD_RE = re.compile(r'^\s*watch\b\s+', re.IGNORECASE)
+
+
+def _is_watch_bait(article):
+    """Return True for video-bait 'Watch:' headlines that should never appear.
+
+    Catches titles like 'Watch: Bodycam footage shows ...', 'Watch | ...',
+    'Watch live ...', 'Watch bodycam footage ...'. Only matches when 'watch'
+    is the first word, so legitimate noun uses ('Apple Watch ...', 'watchdog')
+    are not affected.
+    """
+    title = (article.get("title") or article.get("url") or "")
+    if not title:
+        return False
+    t = title.strip().lstrip('"\u201c\u201d\'')
+    if not t:
+        return False
+    if _WATCH_BAIT_PREFIX_RE.match(t):
+        return True
+    if _WATCH_BRACKET_RE.match(t):
+        return True
+    if _WATCH_LEAD_WORD_RE.match(t):
+        return True
+    return False
+
+
+def _filter_watch_bait(articles):
+    """Drop watch-bait articles deterministically so they never reach AI or output."""
+    if not articles:
+        return []
+    kept = []
+    for art in articles:
+        if _is_watch_bait(art):
+            logging.info("Watch-bait filter: dropping '%s'", (art.get("title") or "")[:90])
+            continue
+        kept.append(art)
+    return kept
+
+
 def _local_group_articles_by_section(all_articles, max_per_section, config):
     """Group by section with within-section dedup plus deterministic cross-section dedup."""
     limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
-    
+
     if max_per_section == 15:  # Use default if not explicitly provided
         max_per_section = limits_config.get("max_section_articles", 8)
-    
+
+    all_articles = _filter_watch_bait(all_articles)
+
     grouped_articles = {}
     section_order = []
     for article in all_articles:
@@ -854,10 +898,17 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
     limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
     
     filtering_prompt = get_config_value(ai_config, "prompts.article_filtering",
-        "Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments.")
+        "Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. Strictly exclude video-bait / watch-promo stories: any story whose headline starts with 'Watch' (e.g. 'Watch:', 'Watch |', 'Watch live', 'Watch bodycam footage ...') such as 'Watch: Bodycam footage shows Virginia police\\'s heroic response to horse fire as man trapped' — these are video-watch prompts, not readable news. Do not exclude legitimate product or institutional news that merely contains 'Watch' as a noun (e.g. 'Apple Watch', 'watchdog'). Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments.")
     
     if max_per_section == 15:  # Use default if not explicitly provided
         max_per_section = limits_config.get("max_section_articles", 8)
+
+    if not all_articles:
+        return {}
+
+    # Deterministic pre-filter so watch-bait never reaches the model or output,
+    # even if the model ignores the prompt.
+    all_articles = _filter_watch_bait(all_articles)
 
     if not all_articles:
         return {}
