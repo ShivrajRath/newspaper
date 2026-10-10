@@ -822,6 +822,63 @@ _WATCH_BAIT_PREFIX_RE = re.compile(r'^\s*(\[watch\]|watch)\s*[:\|\-\u2013\u2014]
 _WATCH_BRACKET_RE = re.compile(r'^\s*\[watch\]', re.IGNORECASE)
 _WATCH_LEAD_WORD_RE = re.compile(r'^\s*watch\b\s+', re.IGNORECASE)
 
+# Media-bait: Listen:/Photos:/Video: family (same video-bait class as Watch:).
+_MEDIA_PREFIX_RE = re.compile(r'^\s*(listen|photos?|pics?|video|interactive|graphic)\s*[:\|\-\u2013\u2014]\s*', re.IGNORECASE)
+_MEDIA_LEAD_RE = re.compile(r'^\s*(listen|photos?|pics?|video)\b\s+', re.IGNORECASE)
+_IN_PICTURES_RE = re.compile(r'^\s*in\s+(pictures|photos|images)\b', re.IGNORECASE)
+_FOOTAGE_LEAD_RE = re.compile(r'^\s*(bodycam|body-cam|dashcam|cctv)\b', re.IGNORECASE)
+
+# Live-blog bait: rolling coverage with little substance per item.
+_LIVE_PREFIX_RE = re.compile(r'^\s*live\b\s*[:\|\-\u2013\u2014]\s*', re.IGNORECASE)
+_LIVE_LEAD_RE = re.compile(r'^\s*live\s+(blog|updates?|coverage|report|results?|scores?)\b', re.IGNORECASE)
+_AS_IT_HAPPENED_RE = re.compile(r'^\s*as it happened\b', re.IGNORECASE)
+
+# Opinion/commentary pieces, not hard news.
+_OPINION_PREFIX_RE = re.compile(
+    r'^\s*(opinion|op-ed|oped|guest essay|editorial|analysis|review|commentary|column|letter|the take|viewpoint)\s*[:\|\-\u2013\u2014]\s*',
+    re.IGNORECASE)
+_OPINION_BRACKET_RE = re.compile(r'^\s*\[(opinion|op-ed|oped|editorial|analysis|review|commentary)\]', re.IGNORECASE)
+
+# Listicles / ranked roundups.
+_LISTICLE_LEAD_RE = re.compile(
+    r'^\s*(top\s+\d+|\d+\s+(best|worst|greatest|things|ways|reasons|tips|tricks|lessons|takeaways|photos|pictures|moments|quotes))\b',
+    re.IGNORECASE)
+_RANKED_PREFIX_RE = re.compile(r'^\s*ranked\s*[:\|\-\u2013\u2014]\s*', re.IGNORECASE)
+
+# Curiosity-gap clickbait phrases (matched anywhere in the title).
+_CURIOSITY_RES = [
+    re.compile(r"you\s+won'?t\s+believe", re.IGNORECASE),
+    re.compile(r"you'?ll\s+never\s+guess", re.IGNORECASE),
+    re.compile(r"will\s+shock\s+you", re.IGNORECASE),
+    re.compile(r"will\s+blow\s+your\s+mind", re.IGNORECASE),
+    re.compile(r"\bjaw-?dropping\b", re.IGNORECASE),
+    re.compile(r"\bmind-?blowing\b", re.IGNORECASE),
+    re.compile(r"\bhere'?s\s+why\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+happens\s+next\b", re.IGNORECASE),
+    re.compile(r"\bdoctors?\s+hate\b", re.IGNORECASE),
+    re.compile(r"\bone\s+(weird|simple)\s+(trick|tip)\b", re.IGNORECASE),
+]
+
+# Service / sponsored filler (matched anywhere; plural-only 'deals' protects
+# 'trade deal' / 'peace deal' hard news).
+_SERVICE_RES = [
+    re.compile(r"\bhoroscopes?\b", re.IGNORECASE),
+    re.compile(r"\bzodiac\b", re.IGNORECASE),
+    re.compile(r"\bwordle\b", re.IGNORECASE),
+    re.compile(r"\bconnections\b.{0,20}\b(puzzle|game|hints?)\b", re.IGNORECASE),
+    re.compile(r"\bcrosswords?\b", re.IGNORECASE),
+    re.compile(r"\bsudoku\b", re.IGNORECASE),
+    re.compile(r"\bsponsored\b", re.IGNORECASE),
+    re.compile(r"\badvertorial\b", re.IGNORECASE),
+    re.compile(r"\bpaid\s+content\b", re.IGNORECASE),
+    re.compile(r"\bdeals\b", re.IGNORECASE),
+    re.compile(r"\bdeal\s+of\s+the\s+day\b", re.IGNORECASE),
+    re.compile(r"\bgift\s+guide\b", re.IGNORECASE),
+    re.compile(r"\bcoupons?\b", re.IGNORECASE),
+    re.compile(r"\bgiveaways?\b", re.IGNORECASE),
+    re.compile(r"\bquiz(zes)?\b", re.IGNORECASE),
+]
+
 
 def _is_watch_bait(article):
     """Return True for video-bait 'Watch:' headlines that should never appear.
@@ -846,17 +903,54 @@ def _is_watch_bait(article):
     return False
 
 
+def _bait_reason(article):
+    """Return a short reason string if the title is bait, else None."""
+    title = (article.get("title") or "")
+    if not title:
+        return None
+    t = title.strip().lstrip('"\u201c\u201d\'')
+    if not t:
+        return None
+    if _is_watch_bait(article):
+        return "watch-bait"
+    if _MEDIA_PREFIX_RE.match(t) or _MEDIA_LEAD_RE.match(t) or _IN_PICTURES_RE.match(t) or _FOOTAGE_LEAD_RE.match(t):
+        return "media-bait"
+    if _LIVE_PREFIX_RE.match(t) or _LIVE_LEAD_RE.match(t) or _AS_IT_HAPPENED_RE.match(t):
+        return "live-blog"
+    if _OPINION_PREFIX_RE.match(t) or _OPINION_BRACKET_RE.match(t):
+        return "opinion"
+    if _LISTICLE_LEAD_RE.match(t) or _RANKED_PREFIX_RE.match(t):
+        return "listicle"
+    for rx in _CURIOSITY_RES:
+        if rx.search(t):
+            return "curiosity-gap"
+    for rx in _SERVICE_RES:
+        if rx.search(t):
+            return "service-filler"
+    return None
+
+
+def _is_bait(article):
+    """Return True for any bait headline (watch, media, live, opinion, listicle, filler)."""
+    return _bait_reason(article) is not None
+
+
 def _filter_watch_bait(articles):
-    """Drop watch-bait articles deterministically so they never reach AI or output."""
+    """Drop bait articles deterministically so they never reach AI or output."""
     if not articles:
         return []
     kept = []
     for art in articles:
-        if _is_watch_bait(art):
-            logging.info("Watch-bait filter: dropping '%s'", (art.get("title") or "")[:90])
+        reason = _bait_reason(art)
+        if reason:
+            logging.info("Bait filter (%s): dropping '%s'", reason, (art.get("title") or "")[:90])
             continue
         kept.append(art)
     return kept
+
+
+# Alias: the filter now covers all bait classes, not just Watch:.
+_filter_bait = _filter_watch_bait
 
 
 def _local_group_articles_by_section(all_articles, max_per_section, config):
@@ -898,7 +992,7 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
     limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
     
     filtering_prompt = get_config_value(ai_config, "prompts.article_filtering",
-        "Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. Strictly exclude video-bait / watch-promo stories: any story whose headline starts with 'Watch' (e.g. 'Watch:', 'Watch |', 'Watch live', 'Watch bodycam footage ...') such as 'Watch: Bodycam footage shows Virginia police\\'s heroic response to horse fire as man trapped' — these are video-watch prompts, not readable news. Do not exclude legitimate product or institutional news that merely contains 'Watch' as a noun (e.g. 'Apple Watch', 'watchdog'). Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments.")
+        "Filter out low-value stories that are insignificant or not broadly relevant to readers, including gore, graphic violence, isolated crime, single-casualty incidents, routine police blotter items, celebrity gossip, and other clickbait. Exclude routine local crime stories such as 'Police investigate after man found dead in parking lot', 'Body found in [location]', 'Shooting investigation underway', or similar isolated incidents without broader impact. Do not include stories about a person being found dead, killed, injured, or arrested without a broader impact, unless the event is a major escalation, public safety crisis, mass casualty event, natural disaster, or major policy/geopolitical development. Strictly exclude video-bait / watch-promo stories: any story whose headline starts with 'Watch' (e.g. 'Watch:', 'Watch |', 'Watch live', 'Watch bodycam footage ...') such as 'Watch: Bodycam footage shows Virginia police\\'s heroic response to horse fire as man trapped' — these are video-watch prompts, not readable news. Do not exclude legitimate product or institutional news that merely contains 'Watch' as a noun (e.g. 'Apple Watch', 'watchdog'). Strictly exclude these additional bait classes. (1) Media-bait: headlines starting with 'Listen', 'Photos'/'Pics', 'Video', 'Interactive' or 'In pictures/photos' (e.g. 'Photos: ...', 'Video shows ...', 'In pictures: ...', 'Bodycam footage ...'). (2) Live-blog bait: headlines starting with 'Live' as a coverage label ('Live:', 'Live blog', 'Live updates', 'As it happened'); do not exclude commodity news like 'Live cattle'. (3) Opinion/commentary: headlines labelled 'Opinion:', 'Op-ed:', 'Editorial:', 'Analysis:', 'Review:', 'Commentary:', 'Column:' or '[Opinion]'. (4) Listicles and curiosity-gap clickbait: 'Top 10 ...', '7 things ...', 'Ranked: ...', 'You won't believe ...', 'will shock you', 'jaw-dropping', 'mind-blowing', 'Here\\'s why' as a tease, 'What happens next', 'Doctors hate ...'. (5) Service/sponsored filler: horoscopes, Wordle/crossword/sudoku, quizzes, 'Deals', 'Deal of the day', 'Gift guide', coupons, giveaways, 'Sponsored'/'Advertorial'/'Paid content'. Do not exclude legitimate trade-deal or peace-deal news when filtering 'deals'. Keep significant and timely stories including major escalations, natural disasters, major accidents, notable scientific breakthroughs, and major policy or geopolitical developments.")
     
     if max_per_section == 15:  # Use default if not explicitly provided
         max_per_section = limits_config.get("max_section_articles", 8)
@@ -906,7 +1000,7 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
     if not all_articles:
         return {}
 
-    # Deterministic pre-filter so watch-bait never reaches the model or output,
+    # Deterministic pre-filter so bait never reaches the model or output,
     # even if the model ignores the prompt.
     all_articles = _filter_watch_bait(all_articles)
 
