@@ -600,18 +600,19 @@
                 border-top: none;
             }
 
-            /* Ensure joke cards are visible in print */
-            .joke-card {
+            /* Ensure joke/riddle cards hidden on screen are still visible in print */
+            .joke-card,
+            .joke-card[hidden],
+            .riddle-card[hidden] {
                 display: block !important;
             }
 
-            .joke-card[hidden] {
-                display: block !important;
-            }
-
-            /* Ensure all cards with hidden attribute are visible in print */
-            [hidden] {
-                display: block !important;
+            /* Keep the stale-edition banner hidden in print when it has no
+               content — otherwise it prints as an empty box between the
+               quote and the market ticker. */
+            #stale-banner[hidden],
+            #stale-banner:empty {
+                display: none !important;
             }
 
             /* Keep headings with the article that follows them */
