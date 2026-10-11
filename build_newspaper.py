@@ -953,6 +953,163 @@ def _filter_watch_bait(articles):
 _filter_bait = _filter_watch_bait
 
 
+# Isolated local crime: single-victim murders, stabbings, shootings and
+# police-blotter items with no broader impact. These are filtered
+# deterministically so they never reach output even when the AI pass
+# misses them (e.g. '1 man stabbed to death in Far North Dallas').
+# Significant crime is NEVER filtered: mass casualty (>=4 victims),
+# serial/spree/terror, school/campus attacks, officer deaths, manhunts,
+# lockdowns, hate crimes with broader impact, or major-event context
+# (war, disaster, etc.).
+_CRIME_KEEP_RES = [
+    re.compile(r"\bmass\b", re.IGNORECASE),
+    re.compile(r"\bserial\b", re.IGNORECASE),
+    re.compile(r"\bspree\b", re.IGNORECASE),
+    re.compile(r"\brampage\b", re.IGNORECASE),
+    re.compile(r"\bterror(?:ist|ism)?\b", re.IGNORECASE),
+    re.compile(r"\bmanhunt\b", re.IGNORECASE),
+    re.compile(r"\blockdown\b", re.IGNORECASE),
+    re.compile(r"\bshelter[ -]?in[ -]?place\b", re.IGNORECASE),
+    re.compile(r"\bpublic\s+safety\b", re.IGNORECASE),
+    re.compile(r"\bhate\s+crime\b", re.IGNORECASE),
+    re.compile(r"\bofficer\b", re.IGNORECASE),
+    re.compile(r"\bdeputy\b", re.IGNORECASE),
+    re.compile(r"\btrooper\b", re.IGNORECASE),
+    # School/campus/house-of-worship/public-gathering attacks are
+    # significant even with few victims.
+    re.compile(r"\bschool\b", re.IGNORECASE),
+    re.compile(r"\bcampus\b", re.IGNORECASE),
+    re.compile(r"\buniversity\b", re.IGNORECASE),
+    re.compile(r"\bchurch\b", re.IGNORECASE),
+    re.compile(r"\bsynagogue\b", re.IGNORECASE),
+    re.compile(r"\bmosque\b", re.IGNORECASE),
+    re.compile(r"\bfestival\b", re.IGNORECASE),
+    re.compile(r"\bparade\b", re.IGNORECASE),
+    # Major-event context means this is not isolated local crime.
+    re.compile(r"\bwar\b", re.IGNORECASE),
+    re.compile(r"\bairstrike\b", re.IGNORECASE),
+    re.compile(r"\bmilitary\b", re.IGNORECASE),
+    re.compile(r"\bearthquake\b", re.IGNORECASE),
+    re.compile(r"\bhurricane\b", re.IGNORECASE),
+    re.compile(r"\btornado\b", re.IGNORECASE),
+    re.compile(r"\btsunami\b", re.IGNORECASE),
+    re.compile(r"\bwildfire\b", re.IGNORECASE),
+    re.compile(r"\bnatural\s+disaster\b", re.IGNORECASE),
+    re.compile(r"\bprotest\b", re.IGNORECASE),
+    re.compile(r"\belection\b", re.IGNORECASE),
+    re.compile(r"\bpolicy\b", re.IGNORECASE),
+    re.compile(r"\bgeopolitic\w*\b", re.IGNORECASE),
+]
+
+_CRIME_COUNT_RE = re.compile(
+    r"(\d+)\s*(?:people|persons?|victims?|dead|killed|injured|wounded|hospitalized|shot|stabbed)",
+    re.IGNORECASE)
+_CRIME_AT_LEAST_RE = re.compile(r"at\s+least\s+(\d+)", re.IGNORECASE)
+_CRIME_WORD_NUMBERS = {
+    "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+    "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "dozen": 12,
+}
+
+_CRIME_DROP_RES = [
+    # Strong crime signals.
+    re.compile(r"\bstabbed\b", re.IGNORECASE),
+    re.compile(r"\bstabbing\b", re.IGNORECASE),
+    re.compile(r"\bbody\s+found\b", re.IGNORECASE),
+    re.compile(r"\bfound\s+dead\b", re.IGNORECASE),
+    re.compile(r"\bfound\s+shot\b", re.IGNORECASE),
+    re.compile(r"\bfound\s+stabbed\b", re.IGNORECASE),
+    re.compile(r"\bshot\s+dead\b", re.IGNORECASE),
+    re.compile(r"\bstabbed\s+to\s+death\b", re.IGNORECASE),
+    re.compile(r"\bshooting\s+investigation\b", re.IGNORECASE),
+    re.compile(r"\bhomicide\b", re.IGNORECASE),
+    re.compile(r"\bmurder\s+investigation\b", re.IGNORECASE),
+    re.compile(r"\bdeath\s+investigation\b", re.IGNORECASE),
+    re.compile(r"\bpolice\s+investigat\w*\b", re.IGNORECASE),
+    # Single-victim phrasing, e.g. '1 man stabbed to death ...',
+    # 'Man killed in [location]', 'Woman found dead'.
+    re.compile(r"\b\d+\s+(man|woman|person|teen|boy|girl|child)\b", re.IGNORECASE),
+    re.compile(r"\b(man|woman|person|teen|teenager|boy|girl|child)\s+(killed|stabbed|shot|murdered)\b",
+               re.IGNORECASE),
+    re.compile(r"\b(man|woman|person|teen|teenager|boy|girl|child)\s+found\b", re.IGNORECASE),
+    re.compile(r"\bbody\s*:\s*", re.IGNORECASE),
+    re.compile(r"\bshooting\s+leaves\s+(one|1|a)\s+(person|man|woman)?\s*dead\b", re.IGNORECASE),
+]
+
+
+def _victim_count(text):
+    """Return the largest victim count mentioned in text, or 0."""
+    if not text:
+        return 0
+    counts = []
+    for m in _CRIME_COUNT_RE.finditer(text):
+        try:
+            counts.append(int(m.group(1)))
+        except ValueError:
+            continue
+    for m in _CRIME_AT_LEAST_RE.finditer(text):
+        try:
+            counts.append(int(m.group(1)))
+        except ValueError:
+            continue
+    low = text.lower()
+    for word, num in _CRIME_WORD_NUMBERS.items():
+        if re.search(r"\b%s\b.{0,30}\b(dead|killed|injured|victims?|shot|stabbed)\b" % word, low):
+            counts.append(num)
+    return max(counts) if counts else 0
+
+
+def _has_crime_significance(text):
+    """Return True when crime text describes a major/significant event to keep."""
+    if not text:
+        return False
+    for rx in _CRIME_KEEP_RES:
+        if rx.search(text):
+            return True
+    if _victim_count(text) >= 4:
+        return True
+    return False
+
+
+def _is_isolated_crime(article):
+    """Return True for single-victim local crime with no broader significance.
+
+    Checks title+summary so significance mentioned in the summary
+    (e.g. mass casualty count) still protects the story.
+    """
+    title = (article.get("title") or "")
+    summary = (article.get("summary") or article.get("description") or "")
+    if not title and not summary:
+        return False
+    full = f"{title} {summary}".strip()
+    if _has_crime_significance(full):
+        return False
+    for rx in _CRIME_DROP_RES:
+        if rx.search(full):
+            # 'police investigat*' alone is too broad (e.g. major
+            # corruption probe) — only treat as blotter when paired
+            # with a dead/body/shooting/stabbing/killed signal.
+            if rx.pattern.startswith(r"\bpolice"):
+                if not re.search(
+                        r"\b(dead|body|shooting|stabbing|stabbed|shot|killed|homicide|murder)\b",
+                        full, re.IGNORECASE):
+                    continue
+            return True
+    return False
+
+
+def _filter_isolated_crime(articles):
+    """Drop isolated single-victim crime deterministically."""
+    if not articles:
+        return []
+    kept = []
+    for art in articles:
+        if _is_isolated_crime(art):
+            logging.info("Isolated-crime filter: dropping '%s'", (art.get("title") or "")[:90])
+            continue
+        kept.append(art)
+    return kept
+
+
 def _local_group_articles_by_section(all_articles, max_per_section, config):
     """Group by section with within-section dedup plus deterministic cross-section dedup."""
     limits_config = config.get("limits", {}) if isinstance(config, dict) else {}
@@ -961,6 +1118,10 @@ def _local_group_articles_by_section(all_articles, max_per_section, config):
         max_per_section = limits_config.get("max_section_articles", 8)
 
     all_articles = _filter_watch_bait(all_articles)
+    # Deterministic safety net for the no-AI path: drop isolated
+    # single-victim crime here (the AI path applies the same filter
+    # as a post-filter so AI indices are preserved).
+    all_articles = _filter_isolated_crime(all_articles)
 
     grouped_articles = {}
     section_order = []
@@ -1097,6 +1258,10 @@ def ai_global_deduplicate_and_filter(all_articles, max_per_section, config, clie
             # Double-check: deterministic pass guarantees no cross-section
             # duplicates survive even if the model missed paraphrased rewrites.
             grouped_articles = deterministic_global_deduplicate(grouped_articles, section_names, config)
+            # Safety net: drop isolated single-victim crime the model kept
+            # (e.g. '1 man stabbed to death in Far North Dallas').
+            for sec_name in list(grouped_articles.keys()):
+                grouped_articles[sec_name] = _filter_isolated_crime(grouped_articles[sec_name])
             return grouped_articles
         except Exception as e:
             if _handle_ai_error(e, f"global deduplication ({model_name})", client_ref):
