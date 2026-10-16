@@ -370,6 +370,16 @@
             letter-spacing: 0.02em;
         }
 
+        .article-links a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .article-links a:hover {
+            text-decoration: underline;
+        }
+
         .no-print {
             display: block;
         }
@@ -534,6 +544,11 @@
             }
 
 
+
+            .article-links a {
+                color: #111;
+                text-decoration: none;
+            }
 
             .article-links p {
                 font-size: 0.85rem;
@@ -959,6 +974,12 @@
                 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
                     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
                 }[c]));
+                const isSafeHttpUrl = (u) => {
+                    try {
+                        const parsed = new URL(u, window.location.href);
+                        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+                    } catch { return false; }
+                };
                 // Render News Categories as individual breakable cards (titles are plain text, no source links)
                 const categoryCards = Object.entries(data.categories || {}).map(([catName, details], index) => {
                     const articlesHTML = (details.articles || []).map(art => {
@@ -977,13 +998,16 @@
                     `;
                 }).filter(Boolean);
 
-                // Render Hacker News Card (screen only, always last; titles are plain text, no source links)
+                // Render Hacker News Card (screen only, always last; titles hyperlinked)
                 let hnCard = '';
                 if (data.hacker_news && data.hacker_news.length > 0) {
                     const hnItems = data.hacker_news.map(hn => {
                         const title = escapeHtml(stripHtml(hn.title || 'Untitled'));
                         const desc = escapeHtml(stripHtml(hn.description || ''));
-                        const titleHTML = `<strong>${title}</strong>`;
+                        const safeUrl = (hn.url && isSafeHttpUrl(hn.url)) ? hn.url : '';
+                        const titleHTML = safeUrl
+                            ? `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer"><strong>${title}</strong></a>`
+                            : `<strong>${title}</strong>`;
                         return `<div class="article-item">${titleHTML}${desc ? `<p>${desc}</p>` : ''}</div>`;
                     }).join('');
 
