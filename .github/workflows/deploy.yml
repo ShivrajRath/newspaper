@@ -2,8 +2,6 @@ name: Generate & Deploy Newspaper
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 3 * * *" # Runs at 9:00 PM CST (UTC-6) / 10:00 PM CDT (UTC-5) — closest year-round approximation (10pm run)
 
 permissions:
   contents: write
